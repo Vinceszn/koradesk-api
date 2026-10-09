@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}admin{% endblock %}
+{% block body %}
+<p class="eyebrow">Internal tooling</p>
+<h1>Kora Desk ops</h1>
+<p class="muted">Every shop-facing action still happens in WhatsApp. This is the back office.</p>
+<div class="grid2">
+<div class="card"><h3>Shops</h3><p class="muted">Onboard, plans, limits, prices, money tabs.</p><a class="btn" href="/admin/shops">Open shops</a></div>
+<div class="card"><h3>Approvals inbox</h3><p class="muted">Oldest first, SLA flagged. Same effect as WhatsApp taps.</p><a class="btn" href="/admin/approvals?status=pending">Open inbox</a></div>
+<div class="card"><h3>Leads</h3><p class="muted">Manual entry, convert straight into onboarding.</p><a class="btn" href="/admin/leads">Open leads</a></div>
+<div class="card"><h3>Costs</h3><p class="muted">Margin enforcement surface. Red means review pricing.</p><a class="btn" href="/admin/costs">Open costs</a></div>
+</div>
+{% endblock %}

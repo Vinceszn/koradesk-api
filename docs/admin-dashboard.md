@@ -1,8 +1,8 @@
-# Kora Desk — Admin & Onboarding Dashboard (needs spec, v1)
+# Kora Desk — Admin & Onboarding Dashboard (v1 built)
 
-Status: DRAFT — flesh-out before build. This dashboard is ops tooling, not
-product: per `architecture.md`, WhatsApp stays the entire customer UI. Nothing
-here is customer self-serve; every shop-facing action still happens in chat.
+Status: BUILT — all screens, deltas, and API from this spec implemented in
+`app/admin.py`, `app/caps.py`, `app/approvals.py`, `app/ops_mail.py` plus
+`app/templates/`. Open questions below are answered and applied.
 
 ## Why this exists (jobs, not screens)
 
@@ -124,11 +124,35 @@ doesn't exist, margins are fiction (per architecture constraint 4).
 4. A shop at 100% cap shows red and blocks new billable sends until a pack
    is sold (cap gate in the send path, not just displayed).
 
-## Open questions for the founder
+## Open questions for the founder — ANSWERED + APPLIED
 
 1. Internal-only v1, or should pilot shops see a read-only status page?
    (Recommendation: internal-only; shops live on WhatsApp per constraint 1.)
+   → ACCEPTED. No shop-visible views built. Prod note: Cloudflare Access
+   (email OTP) in front of `/admin`; see README.
 2. Reminder copy + 6pm summary format: founder-written templates in DB, or
    hardcoded v1? (Recommendation: hardcoded v1, templating is v1.1.)
+   → ACCEPTED. Copy stays hardcoded (`payments.send_reminders`,
+   `scheduler._summary_job`).
 3. Who besides you gets Access emails? (Determines nothing in code, but the
    audit actor strings should be real addresses from day one.)
+   → ACCEPTED. WhatsApp decisions log the sender number; dashboard decisions
+   log `admin:<first ADMIN_EMAILS address>`. `decided_by` widened 64→128.
+
+## Ops mail (founder-only for now, extendable)
+
+Stuck-approval pages (>2h amber / >24h red, hourly, once per level via
+`approvals.escalated/escalated_red`), sub-40% margin alerts (daily, once per
+shop per month via `ops_alerts`), and new-lead notices go to `ADMIN_EMAILS`
+(currently just `hello@koradesk.com`). Add recipients any time:
+`ADMIN_EMAILS=a@x,b@x` — no code change. SMTP from env; empty `SMTP_HOST`
+dev-logs instead of sending.
+
+## Build notes (deviations from spec)
+
+- Added `python-multipart` alongside `jinja2`: FastAPI HTML forms require it.
+- Fixed `order_draft` confirm-on-approve: the old WhatsApp handler matched
+  `kind == "order"` but pipelines write `"order_draft"`, so approvals never
+  confirmed orders. The shared writer (`app/approvals.py`) matches
+  `"order_draft"` — WhatsApp and inbox now behave identically.
+- Fixed `costs._row` first-of-day crash (`None + 1` on fresh ledger rows).

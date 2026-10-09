@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}leads{% endblock %}
+{% block body %}
+<p class="eyebrow">Pipeline</p>
+<h1>Leads</h1>
+<table>
+<tr><th>Name</th><th>Business</th><th>Contact</th><th>Source</th><th>Interest</th><th>Stage</th><th></th></tr>
+{% for l in rows %}
+<tr><td>{{ l.name }}</td><td><b>{{ l.business }}</b></td><td>{{ l.contact }}</td><td>{{ l.source }}</td><td><span class="pill grey">{{ l.plan_interest }}</span></td>
+<td>
+<form class="inline" method="post" action="/admin/leads/{{ l.id }}/stage">
+<select name="stage">{% for s in stages %}<option{% if s==l.stage %} selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+<button class="btn btn-ghost">Set</button>
+</form>
+</td>
+<td>{% if l.shop_id %}<a href="/admin/shops/{{ l.shop_id }}">shop #{{ l.shop_id }}</a>{% else %}<form class="inline" method="post" action="/admin/leads/{{ l.id }}/convert"><button class="btn">Convert to shop</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">no leads — add below</td></tr>{% endfor %}
+</table>
+<div class="card">
+<h3>Manual lead entry</h3>
+<p class="muted">Adding a lead mails ops automatically.</p>
+<form method="post" action="/admin/leads">
+<input name="name" placeholder="name">
+<input name="business" placeholder="business">
+<input name="contact" placeholder="contact (phone/email)" required>
+<input name="source" placeholder="whatsapp" size="12">
+<select name="plan_interest"><option>starter</option><option>growth</option><option>partner</option><option>pilot</option></select>
+<button class="btn">Add lead</button>
+</form>
+</div>
+{% endblock %}

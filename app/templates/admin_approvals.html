@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}approvals{% endblock %}
+{% block body %}
+<p class="eyebrow">Money waiting is the product failing</p>
+<h1>Approvals inbox</h1>
+<p><a class="btn btn-ghost" href="/admin/approvals?status=pending">Pending</a> <a class="btn btn-ghost" href="/admin/approvals?status=decided">Decided</a></p>
+{% for r in rows %}
+<div class="card">
+<p><span class="pill grey">{{ r.a.kind }}</span> #{{ r.a.id }} · <b>{{ r.shop }}</b> · <span class="muted">{{ r.age_h|round(1) }}h old</span>
+{% if r.sla == 'red' %}<span class="pill red">red &gt;24h</span>{% elif r.sla == 'amber' %}<span class="pill amber">amber &gt;2h</span>{% else %}<span class="pill green">fresh</span>{% endif %}</p>
+<p class="muted">{{ r.a.payload_json[:300] }}</p>
+{% if r.a.status == 'pending' %}
+<form class="inline" method="post" action="/admin/approvals/{{ r.a.id }}/decide"><input type="hidden" name="decision" value="approved"><button class="btn">Approve</button></form>
+<form class="inline" method="post" action="/admin/approvals/{{ r.a.id }}/decide"><input type="hidden" name="decision" value="rejected"><button class="btn btn-danger">Reject</button></form>
+{% else %}<p class="muted">{{ r.a.status }} by {{ r.a.decided_by }} at {{ r.a.decided_at }}</p>{% endif %}
+</div>
+{% else %}<div class="card"><p class="muted">Empty. Nothing waiting on money. 🎉</p></div>{% endfor %}
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}shops{% endblock %}
+{% block body %}
+<p class="eyebrow">Shops</p>
+<h1>Shops</h1>
+<form method="get" action="/admin/shops">
+<input name="q" value="{{ q }}" placeholder="Search name or number" size="28">
+<button class="btn btn-ghost">Search</button>
+</form>
+<table>
+<tr><th>Name</th><th>Plan</th><th>Stage</th><th>Convos MTD</th><th>Spend MTD ₦</th><th>Margin</th><th>Pending</th></tr>
+{% for r in rows %}
+<tr>
+<td><a href="/admin/shops/{{ r.shop.id }}"><b>{{ r.shop.name }}</b></a></td>
+<td><span class="pill grey">{{ r.shop.plan }}</span></td>
+<td>{{ r.shop.stage }}</td>
+<td><span class="bar{% if r.blocked %} hot{% endif %}"><i style="width:{{ (r.ratio*100)|round(0,'floor') if r.ratio < 1 else 100 }}%"></i></span>
+<span class="muted">{{ r.used }}/{{ r.cap }}</span>{% if r.blocked %} <span class="pill red">blocked</span>{% endif %}</td>
+<td>{{ r.spend.total_ngn|round(0) }}</td>
+<td>{% if r.margin.margin is none %}<span class="pill grey">n/a</span>{% elif r.margin.flag == 'red' %}<span class="pill red">{{ (r.margin.margin*100)|round(1) }}%</span>{% else %}<span class="pill green">{{ (r.margin.margin*100)|round(1) }}%</span>{% endif %}</td>
+<td>{% if r.pending %}<span class="pill amber">{{ r.pending }}</span>{% else %}<span class="muted">0</span>{% endif %}</td>
+</tr>
+{% endfor %}
+</table>
+<div class="card">
+<h3>New shop</h3>
+<form method="post" action="/admin/shops">
+<input name="name" placeholder="Shop name" required>
+<input name="whatsapp_number" placeholder="WhatsApp number" required>
+<select name="plan"><option>pilot</option><option>starter</option><option>growth</option><option>partner</option></select>
+<button class="btn">Create + start onboarding</button>
+</form>
+</div>
+{% endblock %}

@@ -1,6 +1,5 @@
 """Webhook entrypoint: verify handshake, idempotent ingest, route, approve."""
 
-import datetime as dt
 import json
 
 from fastapi import Depends, FastAPI, Query, Request, Response
@@ -8,14 +7,17 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import costs, models, whatsapp
+from app import approvals, caps, costs, models, whatsapp
 from app.config import settings
 from app.db import get_session, init_db
 from app.pipelines import orders, payments
 from app.scheduler import start as start_scheduler
 from app.security import verify_signature
 
+from app.admin import router as admin_router
+
 app = FastAPI(title="Kora Desk API")
+app.include_router(admin_router)
 
 
 @app.on_event("startup")
@@ -28,6 +30,11 @@ def on_startup() -> None:
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "env": settings.env}
+
+
+@app.get("/favicon.ico")
+def favicon_ico() -> Response:
+    return Response(status_code=204)
 
 
 @app.get("/webhook/receive")
@@ -51,27 +58,36 @@ async def _handle_button(
     session: Session, shop: models.Shop, sender: str, button_id: str
 ) -> None:
     try:
-        action, kind, approval_id = button_id.split(":")
+        action, _kind, approval_id = button_id.split(":")
     except ValueError:
         return
     approval = session.get(models.Approval, int(approval_id or 0))
-    if approval is None or approval.status != "pending":
+    if approval is None:
         return
-    approval.status = "approved" if action == "approve" else "rejected"
-    approval.decided_by = sender
-    approval.decided_at = dt.datetime.now(dt.timezone.utc)
-    session.commit()
-    if approval.status == "approved" and kind == "order":
-        payload = json.loads(approval.payload_json)
-        order = session.get(models.Order, payload.get("order_id"))
-        if order is not None:
-            order.status = "confirmed"
-            session.commit()
+    before = approval.status
+    approvals.decide_approval(
+        session, approval, "approved" if action == "approve" else "rejected", actor=sender
+    )
+    if before == "pending" and approval.status != "pending":
+        await whatsapp.send_text(
+            sender,
+            "Approved. Logged and queued." if approval.status == "approved" else "Rejected. Nothing moved — tell me what to change.",
+        )
+        costs.log_meta_message(session, shop.id)
+
+
+def _capped(session: Session, shop: models.Shop, sender: str) -> bool:
+    """Cap gate in the send path: count the window, block billable sends at 100%."""
+    caps.touch_conversation(session, shop.id, sender)
+    return caps.cap_status(session, shop)["blocked"]
+
+
+async def _send_capped_notice(sender: str, shop: models.Shop) -> None:
     await whatsapp.send_text(
         sender,
-        "Approved. Logged and queued." if approval.status == "approved" else "Rejected. Nothing moved — tell me what to change.",
+        f"Kora Desk is paused for {shop.name}: this month's message allowance is used up. "
+        "Your shop owner has been notified — service resumes on renewal or top-up.",
     )
-    costs.log_meta_message(session, shop.id)
 
 
 @app.post("/webhook/receive")
@@ -116,7 +132,12 @@ async def receive(request: Request, session: Session = Depends(get_session)) -> 
                         or message.get("interactive", {}).get("button_reply", {}).get("id", "")
                     )
                     await _handle_button(session, shop, sender, button_id)
-                elif msg_type == "text":
+                    continue
+                if _capped(session, shop, sender):
+                    await _send_capped_notice(sender, shop)
+                    costs.log_meta_message(session, shop.id)
+                    continue
+                if msg_type == "text":
                     await orders.handle_customer_message(
                         session,
                         shop,

@@ -37,7 +37,13 @@ Meta App Dashboard (WhatsApp → Configuration), using your `VERIFY_TOKEN`.
 - `app/pipelines/orders.py` — voice/text/photo → draft → approval request
 - `app/pipelines/payments.py` — reminder + alert/screenshot matching
 - `app/costs.py` — per-shop Meta + AI spend ledger (feeds pricing review)
-- `app/scheduler.py` — reminders, 6pm summaries, retention purge (APScheduler)
+- `app/scheduler.py` — reminders, 6pm summaries, retention purge, SLA pages,
+  margin alerts (APScheduler)
+- `app/admin.py` — internal ops dashboard: shops, approvals inbox, leads,
+  costs, prices (`/admin`, Jinja templates in `app/templates/`)
+- `app/caps.py` — plan caps, conversation windows, margin + SLA math
+- `app/approvals.py` — one decision writer for WhatsApp taps + admin inbox
+- `app/ops_mail.py` — ops mail (SMTP; console-logged when SMTP_HOST empty)
 
 ## Tests (no DB needed)
 
@@ -45,6 +51,35 @@ Meta App Dashboard (WhatsApp → Configuration), using your `VERIFY_TOKEN`.
 pip install -r requirements.txt
 pytest -q
 ```
+
+## Admin dashboard (internal only)
+
+```bash
+docker compose up --build
+# open http://localhost:8000/admin/shops
+```
+
+- Internal-only v1: no shop logins. In production, put Cloudflare Access
+  (email OTP) in front of `/admin` at the tunnel — zero auth code in the app.
+- Money copy (reminders, 6pm summary) is hardcoded strings (v1 decision);
+  DB templating is v1.1.
+- Audit actors are real addresses: WhatsApp taps log the sender number,
+  dashboard decisions log `admin:<email>`.
+
+## Ops mail (to founder, extendable)
+
+Stuck approvals (>2h amber, >24h red, hourly check), sub-40% margin alerts
+(daily, once per shop per month), and new-lead notices go to `ADMIN_EMAILS`:
+
+```bash
+ADMIN_EMAILS=hello@koradesk.com
+# later: ADMIN_EMAILS=hello@koradesk.com,ops@koradesk.com
+```
+
+SMTP via `SMTP_HOST/PORT/USER/PASS/FROM/TLS` env. With `SMTP_HOST` empty
+(local dev) mail is logged to console instead of sent — nothing disappears
+silently. Each approval mails once per SLA level; margin alerts dedupe per
+shop per month (`ops_alerts`).
 
 ## Production notes (before real shops)
 

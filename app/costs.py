@@ -20,8 +20,11 @@ def _row(session: Session, shop_id: int | None, day: str) -> models.CostLedger:
         )
     ).scalar_one_or_none()
     if row is None:
-        row = models.CostLedger(shop_id=shop_id, day=day)
+        row = models.CostLedger(
+            shop_id=shop_id, day=day, messages=0, meta_cost_ngn=0, ai_cost_ngn=0
+        )
         session.add(row)
+        session.flush()
     return row
 
 

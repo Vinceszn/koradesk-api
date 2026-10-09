@@ -88,10 +88,13 @@ async def handle_bank_alert(
 
 async def send_reminders(session: Session) -> int:
     """Daily nudge for open invoices. Counts against the payment message budget."""
+    from app import caps as _caps
     from app import whatsapp as wa
 
     sent = 0
     for shop in session.execute(select(models.Shop)).scalars():
+        if _caps.cap_status(session, shop)["blocked"]:
+            continue  # capped shops get no billable sends until a pack is sold
         for invoice in open_invoices(session, shop.id):
             await wa.send_text(
                 shop.whatsapp_number,

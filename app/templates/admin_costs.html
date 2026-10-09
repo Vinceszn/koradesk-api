@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}costs {{ month }}{% endblock %}
+{% block body %}
+<p class="eyebrow">Pricing-model enforcement</p>
+<h1>Costs — {{ month }}</h1>
+<form method="get" action="/admin/costs"><input name="month" value="{{ month }}" placeholder="YYYY-MM" size="10"><button class="btn btn-ghost">Go</button></form>
+<table>
+<tr><th>Shop</th><th>Plan</th><th>Meta ₦</th><th>AI ₦</th><th>Total ₦</th><th>Convos</th><th>Plan ₦</th><th>Margin</th></tr>
+{% for r in rows %}
+<tr><td><a href="/admin/shops/{{ r.shop.id }}"><b>{{ r.shop.name }}</b></a></td><td><span class="pill grey">{{ r.shop.plan }}</span></td>
+<td>{{ r.spend.meta_ngn|round(0) }}</td><td>{{ r.spend.ai_ngn|round(0) }}</td><td><b>{{ r.spend.total_ngn|round(0) }}</b></td>
+<td>{{ r.convos }}</td><td>{{ r.margin.price }}</td>
+<td>{% if r.margin.margin is none %}<span class="pill grey">n/a</span>{% elif r.margin.flag == 'red' %}<span class="pill red">{{ (r.margin.margin*100)|round(1) }}%</span>{% else %}<span class="pill green">{{ (r.margin.margin*100)|round(1) }}%</span>{% endif %}</td></tr>
+{% endfor %}
+<tr><td><b>Totals</b></td><td></td><td><b>{{ totals.meta|round(0) }}</b></td><td><b>{{ totals.ai|round(0) }}</b></td><td></td><td></td><td><b>{{ totals.price }}</b></td><td></td></tr>
+</table>
+<p class="muted">Red = margin below 40%. Red shops trigger a mailed pricing-review alert (once per month).</p>
+{% endblock %}

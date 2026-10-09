@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ tab }} · {{ shop.name }}{% endblock %}
+{% block body %}
+<p class="eyebrow">{{ shop.name }}</p>
+<h1>{{ tab|capitalize }}</h1>
+<p><a href="/admin/shops/{{ shop.id }}">← back to shop</a></p>
+{% if tab != 'messages' %}
+<form class="inline" method="get" action="/admin/shops/{{ shop.id }}/{{ tab }}">
+<input name="status" value="{{ status }}" placeholder="filter status" size="14">
+<button class="btn btn-ghost">Filter</button>
+</form>
+{% endif %}
+<table>
+{% for r in rows %}
+<tr><td class="muted">#{{ r.id }}<br>{{ r.created_at }}</td>
+<td>{% if tab=='orders' %}<b>{{ r.customer_name }}</b> · ₦{{ r.total_ngn }} · <span class="pill grey">{{ r.status }}</span><br><span class="muted">{{ r.lines_json[:160] }}</span>{% elif tab=='invoices' %}<b>{{ r.reference }}</b> · ₦{{ r.amount_ngn }} · <span class="pill grey">{{ r.status }}</span>{% elif tab=='payments' %}₦{{ r.amount_ngn }} · {{ r.sender_hint }} · {{ r.source }} · <span class="pill grey">{{ r.status }}</span>{% else %}{{ r.direction }} · {{ r.kind }}<br><span class="muted">{{ r.body[:200] }}</span>{% endif %}</td></tr>
+{% else %}<tr><td class="muted">empty</td></tr>{% endfor %}
+</table>
+<p class="muted">page {{ page }} · 50/page{% if page > 1 %} · <a href="/admin/shops/{{ shop.id }}/{{ tab }}?status={{ status }}&page={{ page-1 }}">prev</a>{% endif %} · <a href="/admin/shops/{{ shop.id }}/{{ tab }}?status={{ status }}&page={{ page+1 }}">next</a></p>
+{% endblock %}

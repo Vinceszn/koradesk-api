@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}prices · {{ shop.name }}{% endblock %}
+{% block body %}
+<p class="eyebrow">{{ shop.name }}</p>
+<h1>Price list</h1>
+<p class="muted">Rows are versioned: deactivate only, never deleted.</p>
+<table>
+<tr><th>Name</th><th>Unit</th><th>Price ₦</th><th></th></tr>
+{% for i in items %}
+<tr><td><b>{{ i.name }}</b></td><td>{{ i.unit }}</td><td>{{ i.price_ngn }}</td>
+<td><form class="inline" method="post" action="/admin/shops/{{ shop.id }}/prices/{{ i.id }}/deactivate"><button class="btn btn-danger">Deactivate</button></form></td></tr>
+{% else %}<tr><td colspan="4" class="muted">empty — paste below</td></tr>{% endfor %}
+</table>
+<div class="grid2">
+<div class="card">
+<h3>Add row</h3>
+<form method="post" action="/admin/shops/{{ shop.id }}/prices">
+<input name="name" placeholder="name" required>
+<input name="unit" placeholder="each" size="8">
+<input name="price_ngn" type="number" min="0" placeholder="price ₦" required>
+<button class="btn">Add</button>
+</form>
+</div>
+<div class="card">
+<h3>Bulk paste</h3>
+<p class="muted"><span style="font-family:monospace">name | unit | price</span> per line</p>
+<form method="post" action="/admin/shops/{{ shop.id }}/prices/bulk">
+<textarea name="bulk" rows="6" cols="44" placeholder="50kg rice | bags | 56000"></textarea><br>
+<button class="btn">Add rows</button>
+</form>
+</div>
+</div>
+{% endblock %}

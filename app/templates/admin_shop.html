@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ row.shop.name }}{% endblock %}
+{% block body %}
+<p class="eyebrow">{{ row.shop.plan }} · {{ row.shop.stage }}</p>
+<h1>{{ row.shop.name }}</h1>
+<p class="muted">{{ row.shop.whatsapp_number }} · cap {{ row.used }}/{{ row.cap }}{% if row.blocked %} · <span class="pill red">sends blocked</span>{% endif %} · {{ row.pending }} pending</p>
+<p>
+<a class="btn btn-ghost" href="/admin/shops/{{ row.shop.id }}/prices">Price list</a>
+<a class="btn btn-ghost" href="/admin/shops/{{ row.shop.id }}/orders">Orders</a>
+<a class="btn btn-ghost" href="/admin/shops/{{ row.shop.id }}/invoices">Invoices</a>
+<a class="btn btn-ghost" href="/admin/shops/{{ row.shop.id }}/payments">Payments</a>
+<a class="btn btn-ghost" href="/admin/shops/{{ row.shop.id }}/messages">Messages</a>
+</p>
+<div class="card">
+<h3>Profile <span class="muted">— all changes logged</span></h3>
+<form method="post" action="/admin/shops/{{ row.shop.id }}/profile">
+<label class="muted">Plan <select name="plan">{% for p in plans %}<option{% if p==row.shop.plan %} selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+<label class="muted">Limit ₦ <input name="approval_limit_ngn" type="number" min="0" value="{{ row.shop.approval_limit_ngn }}"></label>
+<label class="muted">Stage <select name="stage">{% for s in stages %}<option{% if s==row.shop.stage %} selected{% endif %}>{{ s }}</option>{% endfor %}</select></label><br>
+<label class="muted">Cap <input name="monthly_cap" type="number" min="0" value="{{ row.shop.monthly_cap }}"></label>
+<label class="muted">Cap reason <input name="cap_override_reason" value="{{ row.shop.cap_override_reason or '' }}" placeholder="optional" size="30"></label><br>
+<label class="muted">Plan change reason <input name="plan_reason" placeholder="required when changing plan" size="30"></label>
+<button class="btn">Save</button>
+</form>
+<form class="inline" method="post" action="/admin/shops/{{ row.shop.id }}/overage" onsubmit="return confirm('Sell ₦5,000 / 100-conversation pack?')">
+<button class="btn btn-ghost">Sell overage pack</button>
+</form>
+</div>
+<div class="grid2">
+<div class="card">
+<h3>Cost MTD</h3>
+<p>Meta ₦{{ row.spend.meta_ngn|round(0) }} · AI ₦{{ row.spend.ai_ngn|round(0) }} · Total ₦{{ row.spend.total_ngn|round(0) }} · Plan ₦{{ row.margin.price }}</p>
+<p>Margin {% if row.margin.margin is none %}<span class="pill grey">n/a</span>{% elif row.margin.flag == 'red' %}<span class="pill red">{{ (row.margin.margin*100)|round(1) }}%</span>{% else %}<span class="pill green">{{ (row.margin.margin*100)|round(1) }}%</span>{% endif %}</p>
+</div>
+<div class="card">
+<h3>Plan history</h3>
+{% for c in changes %}
+<p class="muted">{{ c.created_at }}: {{ c.from_plan }} → {{ c.to_plan }} by {{ c.actor }} — {{ c.reason }}</p>
+{% else %}<p class="muted">no changes</p>{% endfor %}
+</div>
+</div>
+<div class="card">
+<h3>Pending approvals <span class="muted">— same effect as WhatsApp taps</span></h3>
+{% for a in pending %}
+<p><span class="pill grey">{{ a.kind }}</span> #{{ a.id }} · <span class="muted">{{ a.created_at }}</span><br>
+<span class="muted">{{ a.payload_json[:200] }}</span><br>
+<form class="inline" method="post" action="/admin/approvals/{{ a.id }}/decide"><input type="hidden" name="decision" value="approved"><button class="btn">Approve</button></form>
+<form class="inline" method="post" action="/admin/approvals/{{ a.id }}/decide"><input type="hidden" name="decision" value="rejected"><button class="btn btn-danger">Reject</button></form>
+</p>
+{% else %}<p class="muted">none pending</p>{% endfor %}
+</div>
+{% endblock %}
