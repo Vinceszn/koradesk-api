@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{% block title %}Your workspace{% endblock %} · Kora Desk</title><link rel="stylesheet" href="/assets/commerce.css"><script src="/assets/commerce.js" defer></script></head>
+<body>
+{% if merchant is defined %}
+<aside class="sidebar">
+<a class="brand" href="/"><span class="brand-mark">k.</span> kora<span class="brand-light">desk</span></a>
+<div class="business-chip"><span class="avatar">{{ merchant.name[:1] }}</span><div><strong>{{ merchant.name }}</strong><small>Merchant workspace</small></div></div>
+<div class="nav-label">YOUR BUSINESS</div>
+<nav aria-label="Main navigation">
+{% for key,label,icon in [('overview','Overview','◫'),('products','Products','▦'),('inventory','Inventory','▤'),('team','Your team','♧')] %}
+<a class="nav-item {% if tab == key %}active{% endif %}" href="/app/{{ merchant.id }}{% if key != 'overview' %}/{{ key }}{% endif %}"><span aria-hidden="true">{{ icon }}</span>{{ label }}{% if tab == key %}<i></i>{% endif %}</a>
+{% endfor %}
+</nav>
+<div class="sidebar-note"><span class="small-dot"></span> A good start, every day.<p>Your products, your people,<br>one organised workspace.</p></div>
+<div class="profile"><span class="avatar neutral">{{ user.name[:1] }}</span><div><strong>{{ user.name }}</strong><small>{{ membership.role | capitalize }}</small></div><form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="logout" title="Sign out" aria-label="Sign out">↗</button></form></div>
+</aside>
+<div class="main-shell"><header class="topbar"><span>Workspace <span class="crumb">/</span> {{ {'overview':'Overview','products':'Products','inventory':'Inventory','team':'Your team'}[tab] }}</span><div><span class="pilot-badge">FOUNDING PILOT</span><a class="business-switch" href="/business/new">+ Business</a><form class="mobile-logout" action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="text-button">Sign out</button></form></div></header><main>
+{% if request.query_params.get('notice') %}<div class="notice" role="status">{{ request.query_params.get('notice') }}</div>{% endif %}
+{% block workspace %}{% endblock %}
+<footer>Made for the way you do business. <span>Kora Desk · Merchant preview</span></footer>
+</main></div>
+{% else %}{% block content %}{% endblock %}{% endif %}
+</body></html>

@@ -1,5 +1,14 @@
 # Kora Desk API — backend service (Phase 1 scaffold)
 
+## Merchant commerce preview
+
+The first commerce milestone now has a separate merchant application: accounts,
+business setup, owner/staff access, catalogue/CSV import, and opening stock.
+See [setup, scope and review instructions](docs/merchant-milestone.md).
+Run `python scripts/preview.py --seed` after installing requirements to preview
+locally at `http://127.0.0.1:8010`. The existing WhatsApp service below remains
+separate and unchanged.
+
 WhatsApp is the entire UI. This service receives Cloud API webhooks, runs the
 agent pipelines (Orders first), enforces human approval on money moves, and
 logs every naira of cost. See `../kora-desk/docs/architecture.md` (locked v1)

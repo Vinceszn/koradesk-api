@@ -5,3 +5,8 @@ __pycache__/
 .venv/
 .pytest_cache/
 dist/
+.venv/
+work/
+output/
+.playwright-cli/
+*.db

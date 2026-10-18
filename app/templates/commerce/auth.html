@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% block title %}{{ 'Create account' if register else 'Welcome back' }}{% endblock %}
+{% block content %}<div class="auth-layout"><section class="auth-story"><a class="brand" href="/"><span class="brand-mark">k.</span> kora<span class="brand-light">desk</span></a><div><p class="eyebrow">LESS ADMIN. MORE BUSINESS.</p><h1>A little order.<br>A lot more<br><em>possibility.</em></h1><p class="story-copy">Give your products a home, bring your team together, and start each day knowing what’s in stock.</p><div class="story-card"><span class="check-round">✓</span><div><strong>Everything starts with your shop.</strong><p>A simple setup. A clear view. Room to grow.</p></div></div></div><small>Built for independent businesses.</small></section>
+<section class="auth-form"><div class="auth-inner"><span class="eyebrow">YOUR KORA WORKSPACE</span><h2>{{ 'Let’s get you started.' if register else 'Good to see you again.' }}</h2><p class="muted">{{ 'Create your account, then make space for your business.' if register else 'Sign in to pick up where you left off.' }}</p>
+<form method="post" action="{{ '/register' if register else '/login' }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+{% if register %}<label>Your name<input name="name" autocomplete="name" maxlength="120" required placeholder="Ada Okafor"></label>{% endif %}
+<label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="you@yourbusiness.com"></label>
+<label>Password<input name="password" type="password" autocomplete="{{ 'new-password' if register else 'current-password' }}" minlength="12" maxlength="128" required placeholder="At least 12 characters"></label>
+<button class="button full">{{ 'Create your account' if register else 'Sign in' }} <span>↗</span></button></form>
+<p class="auth-other">{{ 'Already have an account?' if register else 'New to Kora?' }} <a href="{{ '/login' if register else '/register' }}">{{ 'Sign in' if register else 'Create an account' }}</a></p><div class="auth-footnote">Your business has its own private workspace.</div>
+</div></section></div>{% endblock %}
