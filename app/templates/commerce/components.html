@@ -1,0 +1,2 @@
+{% macro icon(name, class_name='') -%}<svg class="icon {{ class_name }}" width="20" height="20" aria-hidden="true"><use href="/assets/icons.svg#{{ name }}"></use></svg>{%- endmacro %}
+{% macro brand(href='/') -%}<a class="brand" href="{{ href }}" aria-label="Kora Desk home"><img src="/assets/brand/app-icon.png" width="40" height="40" alt=""><span>Kora<span class="brand-light">Desk</span><small>YOUR BUSINESS, TOGETHER.</small></span></a>{%- endmacro %}
