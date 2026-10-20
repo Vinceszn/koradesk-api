@@ -54,3 +54,29 @@ def test_sprint_one_upgrade_preserves_existing_account(tmp_path,monkeypatch):
         row=connection.execute(text("SELECT password_hash,email_verified FROM commerce_users WHERE id=1")).one()
         assert row[0]=="preserved-hash" and not row[1]
     engine.dispose()
+
+
+def test_inventory_upgrade_preserves_stock_and_ledger(tmp_path, monkeypatch):
+    url = "sqlite:///" + (tmp_path / "stock.db").as_posix()
+    monkeypatch.setattr(settings, "database_url", url)
+    command.upgrade(config(), "0002_account_catalogue")
+    engine = create_engine(url)
+    with engine.begin() as connection:
+        for sql in [
+            "INSERT INTO commerce_users (id,name,email,password_hash) VALUES (1,'Owner','owner@example.com','hash')",
+            "INSERT INTO commerce_merchants (id,name,category,currency) VALUES (1,'Shop','Retail','NGN')",
+            "INSERT INTO commerce_locations (id,merchant_id,name) VALUES (1,1,'Main')",
+            "INSERT INTO commerce_products (id,merchant_id,name) VALUES (1,1,'Shirt')",
+            "INSERT INTO commerce_variants (id,merchant_id,product_id,sku,label,price_kobo) VALUES (1,1,1,'SHIRT','M',500)",
+            "INSERT INTO commerce_balances (id,merchant_id,location_id,variant_id,on_hand,reserved,counted) VALUES (1,1,1,1,12,2,1)",
+            "INSERT INTO commerce_movements (id,merchant_id,location_id,variant_id,actor_id,quantity,reason,idempotency_key,at) VALUES (1,1,1,1,1,12,'Opening','opening:1:1',100)",
+        ]:
+            connection.execute(text(sql))
+    command.upgrade(config(), "head")
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT on_hand,reserved,counted,version,low_stock_threshold FROM commerce_balances")).one() == (12, 2, 1, 1, 0)
+        assert connection.scalar(text("SELECT SUM(quantity) FROM commerce_movements")) == 12
+    command.downgrade(config(), "0002_account_catalogue")
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT on_hand FROM commerce_balances")) == 12
+    engine.dispose()

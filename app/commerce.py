@@ -280,8 +280,13 @@ def context(request, db, merchant_id, tab):
 @app.get("/app/{merchant_id}")
 @app.get("/app/{merchant_id}/{tab}")
 def dashboard(request: Request, merchant_id: int, tab: str = "overview", db: Session = Depends(get_session)):
-    if tab not in ("overview", "products", "inventory", "team", "settings", "customers"):
+    if tab not in ("overview", "products", "inventory", "team", "settings", "customers", "suppliers"):
         raise HTTPException(404, "Page not found.")
+    if tab in ("inventory", "suppliers"):
+        if tab == "suppliers":
+            workspace(request, db, merchant_id, owner=True)
+        from app.commerce_inventory import inventory_page
+        return inventory_page(request, db, merchant_id, tab)
     ctx = context(request, db, merchant_id, tab)
     if tab in ("inventory", "overview"):
         ctx["movements"] = db.execute(select(m.Movement, m.Variant, m.User).join(m.Variant, m.Variant.id == m.Movement.variant_id).join(m.User, m.User.id == m.Movement.actor_id).where(m.Movement.merchant_id == merchant_id).order_by(m.Movement.id.desc()).limit(100)).all()
@@ -375,7 +380,7 @@ async def opening_stock(request: Request, merchant_id: int, variant_id: int, db:
         raise HTTPException(404, "Variant not found.")
     # Conditional update serialises concurrent counts in PostgreSQL. Ledger write
     # shares this transaction; retries cannot overwrite an established count.
-    result = db.execute(update(m.Balance).where(m.Balance.id == balance.id, m.Balance.counted.is_(False)).values(on_hand=quantity, counted=True))
+    result = db.execute(update(m.Balance).where(m.Balance.id == balance.id, m.Balance.counted.is_(False)).values(on_hand=quantity, counted=True, version=m.Balance.version + 1))
     if result.rowcount != 1:
         raise HTTPException(409, "Opening stock is already recorded. It cannot be overwritten.")
     db.add(m.Movement(merchant_id=merchant_id, location_id=balance.location_id, variant_id=variant_id, actor_id=user.id,
@@ -456,3 +461,5 @@ async def revoke_invite(request: Request, merchant_id: int, invite_id: int, db: 
 # Register maintenance routes after the shared authorization helpers are defined.
 from app.commerce_sprint1 import router as maintenance_router
 app.include_router(maintenance_router)
+from app.commerce_inventory import router as inventory_router
+app.include_router(inventory_router)

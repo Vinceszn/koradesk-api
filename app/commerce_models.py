@@ -118,6 +118,8 @@ class Balance(Base):
     on_hand: Mapped[int] = mapped_column(Integer, default=0)
     reserved: Mapped[int] = mapped_column(Integer, default=0)
     counted: Mapped[bool] = mapped_column(Boolean, default=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    low_stock_threshold: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class Movement(Base):
@@ -147,3 +149,33 @@ class Invitation(Base):
     invited_by: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"))
     expires: Mapped[int] = mapped_column(Integer)
     accepted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Supplier(Base):
+    __tablename__ = "commerce_suppliers"
+    __table_args__ = (UniqueConstraint("id", "merchant_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
+    name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[str] = mapped_column(String(254), default="")
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    notes: Mapped[str] = mapped_column(String(500), default="")
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class StockOperation(Base):
+    """Immutable metadata for a stock movement; corrections append a new row."""
+    __tablename__ = "commerce_stock_operations"
+    __table_args__ = (
+        ForeignKeyConstraint(["supplier_id", "merchant_id"], ["commerce_suppliers.id", "commerce_suppliers.merchant_id"]),
+        CheckConstraint("unit_cost_kobo IS NULL OR unit_cost_kobo >= 0"),
+    )
+    movement_id: Mapped[int] = mapped_column(ForeignKey("commerce_movements.id"), primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
+    kind: Mapped[str] = mapped_column(String(20))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    supplier_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    supplier_name: Mapped[str] = mapped_column(String(120), default="")
+    unit_cost_kobo: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reference: Mapped[str] = mapped_column(String(120), default="")
+    reverses_id: Mapped[int | None] = mapped_column(ForeignKey("commerce_movements.id"), unique=True, nullable=True)
