@@ -26,23 +26,51 @@
 </div>
 
 {% if tab == 'overview' %}
-<section class="metric-strip" aria-label="Inventory summary">
-  <article><div>{{ icon('box') }}<span>Product variants</span></div><strong>{{ rows | length }}</strong><small>In your catalogue</small></article>
-  <article><div>{{ icon('stock') }}<span>Units on hand</span></div><strong>{{ units }}</strong><small>{{ counted }} of {{ rows | length }} variants counted</small></article>
-  <article><div>{{ icon('store') }}<span>Stock at selling price</span></div><strong class="value-metric">{{ value | money }}</strong><small>Selling value, not profit or cost</small></article>
+{% set progress = (counted * 100 / (rows | length)) | round | int if rows else 0 %}
+{% set stock = namespace(empty=0, available=0) %}
+{% for product,variant,balance in rows %}{% if balance.counted and balance.on_hand == 0 %}{% set stock.empty = stock.empty + 1 %}{% endif %}{% if balance.counted %}{% set stock.available = stock.available + balance.on_hand - balance.reserved %}{% endif %}{% endfor %}
+<div class="desk-overview">
+<section class="shop-hero" aria-labelledby="shop-heading">
+  <div class="shop-story"><p class="eyebrow">{{ icon('pin') }} {{ location.name }} · YOUR OPENING INVENTORY</p>
+  <h2 id="shop-heading">{% if ready %}A clearer picture.<br>A stronger start.{% elif rows %}A little counting.<br>A lot more clarity.{% else %}Your next chapter<br>starts on the shelf.{% endif %}</h2>
+  <p>{% if ready %}Every variant has an opening count. Your team can now see the stock you’ve recorded.{% elif rows %}You’ve counted {{ counted }} of {{ rows | length }} variants. Confirm what’s on your shelves so your whole team starts with the same picture.{% else %}Bring your products, stock, and people together. Start by adding the things you sell.{% endif %}</p>
+  <a class="button" href="/app/{{ merchant.id }}/{{ 'team' if ready else ('inventory' if rows else 'products') }}">{{ ('Invite your team' if membership.role == 'owner' else 'Meet your team') if ready else (('Finish opening stock' if membership.role == 'owner' else 'View opening stock') if rows else 'Explore products') }}{{ icon('arrow') }}</a>
+  <span class="hero-caption">{{ icon('shield') }} Your business. One shared source of stock information.</span></div>
+  <div class="stock-visual">
+    <div class="stock-visual-top"><span class="visual-kicker">THE STOCK PICTURE</span><span class="visual-label">{{ 'Count complete' if ready else 'Taking shape' }}</span></div>
+    <div class="readiness-ring" role="img" aria-label="{{ counted }} of {{ rows | length }} variants counted">
+      <svg viewBox="0 0 180 180" aria-hidden="true"><circle class="ring-track" cx="90" cy="90" r="73"/><circle class="ring-fill" cx="90" cy="90" r="73" pathLength="100" stroke-dasharray="{{ progress }} 100"/></svg>
+      <div><strong>{{ progress }}<span>%</span></strong><small>variants counted</small></div>
+    </div>
+    <div class="visual-ledger"><div><span><i class="legend-dot counted-dot"></i>Counted</span><strong>{{ counted }}</strong></div><div><span><i class="legend-dot waiting-dot"></i>Awaiting a count</span><strong>{{ rows | length - counted }}</strong></div></div>
+    <p>{{ 'All opening counts recorded.' if ready else 'Every variant counts. Even the ones with zero stock.' }}</p>
+  </div>
 </section>
-<div class="overview-workflow">
-  <section class="next-step">
-    <span class="icon-tile mint">{{ icon('check' if ready else 'stock') }}</span>
-    <div><p class="eyebrow">{{ 'FOUNDATION COMPLETE' if ready else 'YOUR NEXT STEP' }}</p><h2>{% if ready %}Your opening inventory is ready.{% elif rows %}{{ rows | length - counted }} {{ 'variant needs' if rows | length - counted == 1 else 'variants need' }} a count.{% else %}Let’s put your products on the shelf.{% endif %}</h2><p>{% if ready %}Your catalogue and physical counts agree. Invite your team to see what’s in stock.{% elif rows %}Count what’s physically at {{ location.name }} to complete your opening inventory.{% else %}Add your first product or import your catalogue from a CSV.{% endif %}</p><a class="button" href="/app/{{ merchant.id }}/{{ 'team' if ready else ('inventory' if rows else 'products') }}">{{ 'Bring your team in' if ready else ('Finish opening stock' if rows else 'Build your catalogue') }}{{ icon('arrow') }}</a></div>
-  </section>
-  <section class="setup-panel" id="setup"><div class="section-heading"><h2>Set up your shop</h2><span class="count">{{ 1 + (1 if rows else 0) + (1 if ready else 0) }} / 3 complete</span></div>
-    <ol class="setup-list"><li class="done"><span>{{ icon('check') }}</span><div><strong>Create your business</strong><small>{{ merchant.name }}</small></div></li>
-    <li class="{{ 'done' if rows else '' }}"><span>{{ icon('check') if rows else '2' }}</span><a href="/app/{{ merchant.id }}/products"><strong>Add your products</strong><small>{{ rows | length }} variants in your catalogue</small></a>{{ icon('chevron') }}</li>
-    <li class="{{ 'done' if ready else '' }}"><span>{{ icon('check') if ready else '3' }}</span><a href="/app/{{ merchant.id }}/inventory"><strong>Confirm opening stock</strong><small>{{ counted }} of {{ rows | length }} variants counted</small></a>{{ icon('chevron') }}</li></ol>
-  </section>
+<section class="desk-metrics" aria-label="Inventory summary">
+  <article><span class="metric-icon mint">{{ icon('box') }}</span><div><span>Product variants</span><strong>{{ rows | length }}</strong><small>Each size or colour is one variant.</small></div></article>
+  <article><span class="metric-icon lavender">{{ icon('stock') }}</span><div><span>Units on hand</span><strong>{{ units }}</strong><small>From {{ counted }} recorded opening counts.</small></div></article>
+  <article><span class="metric-icon sun">{{ icon('store') }}</span><div><span>Stock at selling price</span><strong class="money-metric">{{ value | money }}</strong><small>Selling value, not profit or cost.</small></div></article>
+</section>
+<section class="shop-setup" id="setup"><div class="section-heading"><div><p class="eyebrow">BUILD A GOOD FOUNDATION</p><h2>Three steps. One organised shop.</h2></div><span class="badge green">{{ 1 + (1 if rows else 0) + (1 if ready else 0) }} / 3 complete</span></div>
+  <ol class="setup-path">
+    <li class="complete"><span class="step-number">{{ icon('check') }}</span><div><small>01 / YOUR SPACE</small><h3>Create your business</h3><p>{{ merchant.name }}<br>{{ location.name }}</p><span class="step-finished">Workspace created</span></div></li>
+    <li class="{{ 'complete' if rows else 'current' }}"><span class="step-number">{{ icon('check') if rows else '02' }}</span><div><small>02 / YOUR PRODUCTS</small><h3>Build your catalogue</h3><p>Add each product, its variants, and a selling price. Have a list? Import a CSV.</p><a href="/app/{{ merchant.id }}/products">{{ 'View ' ~ (rows | length) ~ ' variants' if rows else 'Add your first product' }} {{ icon('arrow') }}</a></div></li>
+    <li class="{{ 'complete' if ready else 'current' }}"><span class="step-number">{{ icon('check') if ready else '03' }}</span><div><small>03 / YOUR STOCK</small><h3>Count what you have</h3><p>Record the physical quantity of every variant, including items with zero stock.</p><a href="/app/{{ merchant.id }}/inventory">{{ 'Review opening counts' if ready else 'Continue counting' }} {{ icon('arrow') }}</a></div></li>
+  </ol>
+</section>
+<div class="desk-detail-grid">
+  <section class="panel catalogue-panel desk-catalogue"><div class="section-heading"><div><p class="eyebrow">ON YOUR SHELVES</p><h2>Your catalogue</h2><p>Products, prices, and the stock behind them.</p></div><a class="text-link" href="/app/{{ merchant.id }}/products">View all{{ icon('arrow') }}</a></div>{{ product_table() }}</section>
+  <aside class="desk-notes">
+    <section class="stock-note"><span class="icon-tile sun">{{ icon('stock') }}</span><p class="eyebrow">WORTH A LOOK</p><h2>{{ rows | length - counted }} awaiting a count.</h2><p>{% if rows | length > counted %}These variants aren’t included in your stock totals yet. A count gives them a starting point.{% elif rows %}Every variant has a starting quantity. {{ stock.empty }} {{ 'variant is' if stock.empty == 1 else 'variants are' }} recorded with zero stock.{% else %}Your stock picture will appear once you add products and record their quantities.{% endif %}</p><a class="text-link" href="/app/{{ merchant.id }}/inventory">Open inventory{{ icon('arrow') }}</a></section>
+    <section class="numbers-guide"><p class="eyebrow">MAKE SENSE OF YOUR NUMBERS</p><h2>A little stock know-how.</h2>
+      <details><summary>On hand vs. available {{ icon('plus') }}</summary><p>On hand is the stock recorded at your location. Available is on hand minus reserved units. You currently have {{ stock.available }} available units from counted variants.</p></details>
+      <details><summary>What is stock value? {{ icon('plus') }}</summary><p>Each counted variant’s on-hand quantity multiplied by its selling price, added together. It is not sales revenue, profit, or the cost you paid.</p></details>
+      <details><summary>Why count zero stock? {{ icon('plus') }}</summary><p>A zero count confirms that you checked the item and have none. An uncounted item is still unknown and is excluded from totals.</p></details>
+    </section>
+  </aside>
 </div>
-<section class="panel catalogue-panel"><div class="section-heading"><div><h2>Your catalogue</h2><p>A closer look at what’s on hand.</p></div><a class="text-link" href="/app/{{ merchant.id }}/products">View all products{{ icon('arrow') }}</a></div>{{ product_table() }}</section>
+<section class="team-ribbon"><span class="icon-tile pink">{{ icon('team') }}</span><div><h2>Good businesses run on good teamwork.</h2><p>{{ members | length }} {{ 'person has' if members | length == 1 else 'people have' }} access. Staff can view the catalogue and stock; owners manage changes.</p></div><a class="button secondary" href="/app/{{ merchant.id }}/team">Your team{{ icon('arrow') }}</a></section>
+</div>
 
 {% elif tab == 'products' %}
 <section class="panel catalogue-panel" data-product-list>

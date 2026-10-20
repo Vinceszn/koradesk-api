@@ -6,7 +6,9 @@
   <title>{% block title %}Your workspace{% endblock %} · Kora Desk</title>
   <link rel="icon" href="/assets/brand/favicon.png">
   <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/commerce.css"><script src="/assets/commerce.js" defer></script>
+  <link rel="stylesheet" href="/assets/commerce.css">
+  {% if tab is defined and tab == 'overview' %}<link rel="stylesheet" href="/assets/overview.css">{% endif %}
+  <script src="/assets/commerce.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to content</a>
