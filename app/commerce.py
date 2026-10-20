@@ -283,7 +283,7 @@ def dashboard(request: Request, merchant_id: int, tab: str = "overview", db: Ses
     if tab not in ("overview", "products", "inventory", "team"):
         raise HTTPException(404, "Page not found.")
     ctx = context(request, db, merchant_id, tab)
-    if tab == "inventory":
+    if tab in ("inventory", "overview"):
         ctx["movements"] = db.execute(select(m.Movement, m.Variant, m.User).join(m.Variant, m.Variant.id == m.Movement.variant_id).join(m.User, m.User.id == m.Movement.actor_id).where(m.Movement.merchant_id == merchant_id).order_by(m.Movement.id.desc()).limit(100)).all()
     return templates.TemplateResponse(request, "workspace.html", ctx)
 
