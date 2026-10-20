@@ -1,0 +1,20 @@
+{% extends 'base.html' %}{% block title %}Your account{% endblock %}
+{% block content %}<div class="standalone account-page">{{ brand() }}<section class="panel">
+{% if mode == 'account' %}
+<h1>Your account</h1><p>{{ user.name }} · {{ user.email }}</p><p class="hint">{{ 'Email verified' if user.email_verified else 'Email not yet verified. Confirm your email to establish account ownership.' }}</p>
+{% if not user.email_verified %}<form method="post" action="/account/verify"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button">Send verification email</button></form>{% endif %}
+<h2>Change password</h2><form method="post" action="/account/password"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Current password<input name="current_password" type="password" autocomplete="current-password" required></label><label>New password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><p class="hint">Use 12–128 characters. Changing your password signs out all sessions.</p><button class="button">Change password</button></form>
+{% elif mode == 'forgot' %}
+<h1>Reset your password</h1><p>Enter your account email. If an account matches, we’ll send a reset link.</p><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Email address<input type="email" name="email" autocomplete="email" maxlength="254" required></label><button class="button">Send reset link</button></form>
+{% elif mode == 'reset' %}
+<h1>Choose a new password</h1><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>New password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><p class="hint">Use 12–128 characters. This will sign out all existing sessions.</p><button class="button">Save new password</button></form>
+{% elif mode == 'verify' %}
+<h1>Confirm your email</h1><p>Confirm that you own the email address that received this link.</p><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button">Verify email</button></form>
+{% elif mode == 'sent' %}
+<h1>Check your email</h1><p>If an account matches, look for a link valid for 30 minutes. Check your inbox and spam folder. If no email arrives, wait a few minutes and try again.</p>{% if preview_mail %}<p class="hint">Local preview: emails are saved in the local test mailbox. No external email is sent.</p>{% endif %}
+{% elif mode == 'verified' %}
+<h1>Email verified</h1><p>Your email address has been confirmed.</p>
+{% elif mode == 'reset-done' %}
+<h1>Password updated</h1><p>Your previous sessions are signed out. Sign in with your new password.</p>
+{% endif %}
+<div class="actions"><a class="text-link" href="/login">Sign in</a><a class="text-link" href="/businesses">Your workspaces</a></div></section></div>{% endblock %}

@@ -15,13 +15,24 @@ args = parser.parse_args()
 (ROOT / "work").mkdir(exist_ok=True)
 os.environ["DATABASE_URL"] = "sqlite:///" + (ROOT / "work" / "merchant-preview.db").as_posix()
 os.environ["ENV"] = "dev"
+os.environ["COMMERCE_MAIL_MODE"] = "file"
+os.environ["COMMERCE_PUBLIC_URL"] = f"http://127.0.0.1:{args.port}"
+os.environ["COMMERCE_MAIL_DIRECTORY"] = str(ROOT / "work" / "mailbox")
 
 from sqlalchemy import select
 from app.db import Base, engine, SessionLocal
 from app import commerce_models as m
 from app.commerce import add_variant, hash_password
 
-Base.metadata.create_all(engine)
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import inspect
+cfg = Config(str(ROOT / "alembic.ini"))
+tables = inspect(engine).get_table_names()
+# Earlier isolated previews predate Alembic; adopt only that known local schema.
+if "commerce_users" in tables and "alembic_version" not in tables:
+    command.stamp(cfg, "0001_commerce")
+command.upgrade(cfg, "head")
 if args.seed:
     with SessionLocal() as db:
         user = db.scalar(select(m.User).where(m.User.email == "ada@example.com"))

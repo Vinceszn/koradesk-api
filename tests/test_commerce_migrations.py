@@ -41,3 +41,16 @@ def test_migration_compiles_for_postgresql(monkeypatch):
     assert "CREATE TABLE commerce_balances" in sql
     assert "FOREIGN KEY(variant_id, merchant_id)" in sql
     assert "CREATE TABLE shops" not in sql
+
+def test_sprint_one_upgrade_preserves_existing_account(tmp_path,monkeypatch):
+    url="sqlite:///"+(tmp_path/"existing.db").as_posix()
+    monkeypatch.setattr(settings,"database_url",url)
+    command.upgrade(config(),"0001_commerce")
+    engine=create_engine(url)
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO commerce_users (id,name,email,password_hash) VALUES (1,'Existing','existing@example.com','preserved-hash')"))
+    command.upgrade(config(),"head")
+    with engine.connect() as connection:
+        row=connection.execute(text("SELECT password_hash,email_verified FROM commerce_users WHERE id=1")).one()
+        assert row[0]=="preserved-hash" and not row[1]
+    engine.dispose()

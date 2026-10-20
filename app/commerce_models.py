@@ -10,6 +10,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(254), unique=True)
     password_hash: Mapped[str] = mapped_column(Text)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
 
 class LoginSession(Base):
@@ -33,6 +34,10 @@ class Merchant(Base):
     name: Mapped[str] = mapped_column(String(120))
     category: Mapped[str] = mapped_column(String(80))
     currency: Mapped[str] = mapped_column(String(3), default="NGN")
+    contact_email: Mapped[str] = mapped_column(String(254), default="", server_default="")
+    phone: Mapped[str] = mapped_column(String(40), default="", server_default="")
+    address: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    receipt_note: Mapped[str] = mapped_column(String(300), default="", server_default="")
 
 
 class Membership(Base):
@@ -73,6 +78,29 @@ class Variant(Base):
     sku: Mapped[str] = mapped_column(String(64))
     label: Mapped[str] = mapped_column(String(120), default="Standard")
     price_kobo: Mapped[int] = mapped_column(Integer)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
+
+class AccountToken(Base):
+    __tablename__ = "commerce_account_tokens"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id", ondelete="CASCADE"))
+    purpose: Mapped[str] = mapped_column(String(16))
+    expires: Mapped[int] = mapped_column(Integer)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Customer(Base):
+    __tablename__ = "commerce_customers"
+    __table_args__ = (UniqueConstraint("id", "merchant_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
+    name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[str] = mapped_column(String(254), default="")
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    notes: Mapped[str] = mapped_column(String(500), default="")
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Balance(Base):

@@ -280,11 +280,25 @@ def context(request, db, merchant_id, tab):
 @app.get("/app/{merchant_id}")
 @app.get("/app/{merchant_id}/{tab}")
 def dashboard(request: Request, merchant_id: int, tab: str = "overview", db: Session = Depends(get_session)):
-    if tab not in ("overview", "products", "inventory", "team"):
+    if tab not in ("overview", "products", "inventory", "team", "settings", "customers"):
         raise HTTPException(404, "Page not found.")
     ctx = context(request, db, merchant_id, tab)
     if tab in ("inventory", "overview"):
         ctx["movements"] = db.execute(select(m.Movement, m.Variant, m.User).join(m.Variant, m.Variant.id == m.Movement.variant_id).join(m.User, m.User.id == m.Movement.actor_id).where(m.Movement.merchant_id == merchant_id).order_by(m.Movement.id.desc()).limit(100)).all()
+    if tab in ("settings", "customers"):
+        workspace(request, db, merchant_id, owner=True)
+        ctx["mode"] = tab
+        if tab == "customers":
+            query = select(m.Customer).where(m.Customer.merchant_id == merchant_id)
+            if request.query_params.get("archived") != "1":
+                query = query.where(m.Customer.archived.is_(False))
+            search = request.query_params.get("q", "").strip()[:120]
+            if search:
+                query = query.where(m.Customer.name.contains(search, autoescape=True) | m.Customer.email.contains(search, autoescape=True) | m.Customer.phone.contains(search, autoescape=True))
+            ctx["customers"] = db.scalars(query.order_by(m.Customer.name)).all()
+        return templates.TemplateResponse(request, "manage.html", ctx)
+    if tab == "products" and request.query_params.get("archived") != "1":
+        ctx["rows"] = [row for row in ctx["rows"] if not row[1].archived]
     return templates.TemplateResponse(request, "workspace.html", ctx)
 
 
@@ -438,3 +452,7 @@ async def revoke_invite(request: Request, merchant_id: int, invite_id: int, db: 
     invitation.expires = 0
     db.commit()
     return redirect(f"/app/{merchant_id}/team")
+
+# Register maintenance routes after the shared authorization helpers are defined.
+from app.commerce_sprint1 import router as maintenance_router
+app.include_router(maintenance_router)
