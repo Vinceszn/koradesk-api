@@ -1,8 +1,6 @@
 """Merchant application. Isolated entrypoint: no legacy admin or WhatsApp jobs."""
-import csv
 import hashlib
 import hmac
-import io
 import re
 import secrets
 import time
@@ -272,7 +270,7 @@ def context(request, db, merchant_id, tab):
     counted = sum(1 for _, _, balance in rows if balance.counted)
     members = db.execute(select(m.User, m.Membership).join(m.Membership, m.Membership.user_id == m.User.id).where(m.Membership.merchant_id == merchant_id)).all()
     return dict(user=user, csrf=login.csrf, membership=membership, merchant=merchant, location=location, rows=rows, tab=tab,
-                counted=counted, units=sum(b.on_hand for _, _, b in rows), value=sum(v.price_kobo * b.on_hand for _, v, b in rows),
+                catalogue_count=len(rows), counted=counted, units=sum(b.on_hand for _, _, b in rows), value=sum(v.price_kobo * b.on_hand for _, v, b in rows),
                 members=members, ready=bool(rows) and counted == len(rows),
                 invitations=db.scalars(select(m.Invitation).where(m.Invitation.merchant_id == merchant_id, m.Invitation.accepted.is_(False), m.Invitation.expires > int(time.time()))).all())
 
@@ -280,6 +278,9 @@ def context(request, db, merchant_id, tab):
 @app.get("/app/{merchant_id}")
 @app.get("/app/{merchant_id}/{tab}")
 def dashboard(request: Request, merchant_id: int, tab: str = "overview", db: Session = Depends(get_session)):
+    if tab == "import":
+        workspace(request, db, merchant_id, owner=True)
+        return redirect(f"/app/{merchant_id}/products#catalogue-import")
     if tab not in ("overview", "products", "inventory", "team", "settings", "customers", "suppliers"):
         raise HTTPException(404, "Page not found.")
     if tab in ("inventory", "suppliers"):
@@ -288,6 +289,8 @@ def dashboard(request: Request, merchant_id: int, tab: str = "overview", db: Ses
         from app.commerce_inventory import inventory_page
         return inventory_page(request, db, merchant_id, tab)
     ctx = context(request, db, merchant_id, tab)
+    if tab == "team":
+        return templates.TemplateResponse(request, "team.html", ctx)
     if tab in ("inventory", "overview"):
         ctx["movements"] = db.execute(select(m.Movement, m.Variant, m.User).join(m.Variant, m.Variant.id == m.Movement.variant_id).join(m.User, m.User.id == m.Movement.actor_id).where(m.Movement.merchant_id == merchant_id).order_by(m.Movement.id.desc()).limit(100)).all()
     if tab in ("settings", "customers"):
@@ -351,23 +354,38 @@ async def import_products(request: Request, merchant_id: int, db: Session = Depe
     if len(raw) > 1000000:
         raise HTTPException(400, "CSV must be smaller than 1 MB.")
     try:
-        reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))
-        if reader.fieldnames != ["name", "variant", "sku", "price"]:
-            raise HTTPException(400, "Use the sample CSV columns: name, variant, sku, price.")
-        rows = list(reader)
-        if not 1 <= len(rows) <= 500:
-            raise HTTPException(400, "Import between 1 and 500 variants at a time.")
-        for index, row in enumerate(rows, start=2):
-            if None in row or any(v is None for v in row.values()):
-                raise HTTPException(400, f"CSV row {index} has missing or extra columns. Nothing was imported.")
+        from app.commerce_csv import catalogue_rows
+        rows = catalogue_rows(raw)
+        added, skipped, seen = 0, 0, set()
+        for index, row in rows:
             try:
-                add_variant(db, merchant_id, row)
+                sku = clean(row["sku"], "SKU", 64).upper()
+                name = clean(row["name"], "Product name", 160)
+                label = clean(row["variant"] or "Standard", "Variant")
+                price = price_value(row["price"])
+                if sku in seen:
+                    raise HTTPException(400, f"SKU {sku} appears more than once in this file.")
+                seen.add(sku)
+                existing = db.scalar(select(m.Variant).where(m.Variant.merchant_id == merchant_id, m.Variant.sku == sku))
+                if existing:
+                    product = db.get(m.Product, existing.product_id)
+                    if (product.name, existing.label, existing.price_kobo, existing.archived) != (name, label, price, row["archived"]):
+                        raise HTTPException(400, f"SKU {sku} already exists with different details. Edit that variant in Products or use a new SKU.")
+                    skipped += 1
+                    continue
+                variant = add_variant(db, merchant_id, row)
+                variant.archived = row["archived"]
+                added += 1
             except HTTPException as exc:
                 raise HTTPException(400, f"CSV row {index}: {exc.detail} Nothing was imported.")
         db.commit()
-    except (UnicodeDecodeError, csv.Error):
-        raise HTTPException(400, "Use a valid UTF-8 CSV file. Nothing was imported.")
-    return redirect(f"/app/{merchant_id}/products?notice=Imported+{len(rows)}+variants.+Record+opening+stock+next.")
+    except (HTTPException, IntegrityError) as exc:
+        db.rollback()
+        ctx = context(request, db, merchant_id, "products")
+        ctx["rows"] = [row for row in ctx["rows"] if not row[1].archived]
+        ctx["import_error"] = exc.detail if isinstance(exc, HTTPException) else "A product changed while importing. Nothing was imported. Reload your catalogue and try again."
+        return templates.TemplateResponse(request, "workspace.html", ctx, status_code=400)
+    return redirect(f"/app/{merchant_id}/products?notice=Imported+{added}+variants.+Skipped+{skipped}+unchanged+variants.+Stock+quantities+were+not+changed.")
 
 
 @app.post("/app/{merchant_id}/stock/{variant_id}")
@@ -398,12 +416,14 @@ async def invite(request: Request, merchant_id: int, db: Session = Depends(get_s
     if existing:
         raise HTTPException(409, "This person is already a member of your business.")
     token = secrets.token_urlsafe(32)
+    db.execute(update(m.Invitation).where(m.Invitation.merchant_id == merchant_id, m.Invitation.email == email,
+        m.Invitation.accepted.is_(False)).values(expires=0))
     db.add(m.Invitation(merchant_id=merchant_id, email=email, token_hash=digest(token), invited_by=user.id, expires=int(time.time()) + 7 * 86400))
     db.commit()
     ctx = context(request, db, merchant_id, "team")
     ctx["invite_link"] = str(request.base_url).rstrip("/") + "/invite/" + token
     ctx["invite_email"] = email
-    return templates.TemplateResponse(request, "workspace.html", ctx)
+    return templates.TemplateResponse(request, "team.html", ctx)
 
 
 @app.get("/invite/{token}")

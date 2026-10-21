@@ -23,7 +23,7 @@
     {% endfor %}
   </nav>
   <div class="sidebar-bottom">
-    <a class="setup-shortcut" href="/app/{{ merchant.id }}#setup"><span class="setup-symbol">{{ icon('check' if ready else 'store') }}</span><div><strong>{{ 'Opening stock ready' if ready else 'Let’s set up shop' }}</strong><small>{{ 1 + (1 if rows else 0) + (1 if ready else 0) }} of 3 steps complete</small></div>{{ icon('chevron') }}</a>
+    <a class="setup-shortcut" href="/app/{{ merchant.id }}#setup"><span class="setup-symbol">{{ icon('check' if ready else 'store') }}</span><div><strong>{{ 'Opening stock ready' if ready else 'Let’s set up shop' }}</strong><small>{{ 1 + (1 if catalogue_count else 0) + (1 if ready else 0) }} of 3 steps complete</small></div>{{ icon('chevron') }}</a>
     <a class="new-business" href="/businesses">{{ icon('store') }} Switch business</a><a class="new-business" href="/account">{{ icon('shield') }} My account</a><a class="new-business" href="/business/new">{{ icon('plus') }} Add a business</a>
     <div class="sidebar-foot"><span class="brand-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Made for your everyday.</span></div>
   </div>

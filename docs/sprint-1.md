@@ -8,7 +8,7 @@ Implemented on the review branch, without merging or deploying.
 - Settings: business name/category, location name, contact email, phone, address, and future receipt note.
 - Switch business: explicit membership-scoped chooser; account access is also available from the avatar on phones.
 - Products: edit name/variant/SKU/price; stale variant edits return a conflict; renaming affects sibling variants. Archive one variant or the entire product's variants, include archived entries, restore variants.
-- Export: owner-only catalogue CSV, including archived status, exact two-decimal prices and spreadsheet-formula escaping. This report has an extra status column and is not the four-column import template.
+- Export: owner-only catalogue CSV, including archived status, exact two-decimal prices and spreadsheet-formula escaping. Following the feature audit, this export can be re-imported: matching existing products are skipped and conflicting details are reported without overwriting stock.
 - Customers: owner-only create, search, edit, archive and restore; tenant-bound routes. Email and phone are optional. Operational staff permissions arrive in Sprint 4.
 
 Archived inventory remains visible in inventory and is retained in overview totals; archiving does not destroy quantities or movements. Email verification is recorded but does not yet gate commerce access. Business logos and receipt generation belong to the receipt increment; this sprint stores receipt text.

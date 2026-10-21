@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Your team{% endblock %}
+{% macro token() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}
+{% block workspace %}
+<div class="page-heading"><div><h1>Your team</h1><p class="page-description">Manage who can access {{ merchant.name }}.</p></div><span class="badge grey">{{ members | length }} {{ 'member' if members | length == 1 else 'members' }}</span></div>
+{% if invite_link is defined %}
+<section class="notice team-share" role="status"><div><strong>Invitation ready for {{ invite_email }}</strong><p>Copy and share this private link. It expires in seven days; no email has been sent.</p></div><div class="copy-row"><input id="invite-link" aria-label="Invitation link" readonly value="{{ invite_link }}"><button class="button secondary" data-copy="invite-link"><span>Copy link</span></button></div></section>
+{% endif %}
+<div class="team-workspace">
+<section class="panel team-directory"><div class="section-heading"><div><h2>Members</h2><p>People with access to this business.</p></div></div>
+{% for person,member in members %}
+<div class="team-person"><span class="avatar">{{ person.name[:1] }}</span><div class="team-person-info"><strong>{{ person.name }}{% if person.id == user.id %}<small> · You</small>{% endif %}</strong><span>{{ person.email }}</span></div><div class="team-person-role"><span class="badge {{ 'green' if member.role == 'owner' else 'grey' }}">{{ 'Owner' if member.role == 'owner' else 'Staff · View only' }}</span>{% if member.role == 'staff' and membership.role == 'owner' %}<form method="post" action="/app/{{ merchant.id }}/members/{{ member.id }}/remove" data-confirm>{{ token() }}<button class="text-button danger">Remove access</button></form>{% endif %}</div></div>
+{% endfor %}
+</section>
+{% if membership.role == 'owner' %}
+<section class="panel team-invite" id="invite-panel"><h2>Invite a teammate</h2><p class="hint">Staff can view products and inventory. Only owners can make changes or view purchase costs.</p><form method="post" action="/app/{{ merchant.id }}/invite">{{ token() }}<label>Staff email address<input type="email" name="email" maxlength="254" required placeholder="name@example.com"></label><button class="button">Create invitation</button></form><p class="hint">You’ll receive a link to share. Creating a new invitation for the same email replaces the previous link.</p></section>
+{% endif %}
+</div>
+<section class="panel team-pending"><div class="section-heading"><div><h2>Pending invitations <span class="muted">({{ invitations | length }})</span></h2><p>Invitations expire after seven days.</p></div></div>
+{% for invitation in invitations %}<div class="team-person"><div class="team-person-info"><strong>{{ invitation.email }}</strong><span>Expires {{ invitation.expires | date }}</span></div><span class="badge amber">Awaiting acceptance</span>{% if membership.role == 'owner' %}<form method="post" action="/app/{{ merchant.id }}/invites/{{ invitation.id }}/revoke">{{ token() }}<button class="text-button danger">Revoke invitation</button></form>{% endif %}</div>
+{% else %}<div class="team-empty">No pending invitations.</div>{% endfor %}
+</section>
+<details class="panel team-permissions"><summary>About roles and access</summary><p>Owners manage business settings, products, stock, suppliers, customers and team access. Staff can view the catalogue, inventory and team directory. Access applies only to this business. Removing a member immediately removes their access.</p></details>
+{% endblock %}
