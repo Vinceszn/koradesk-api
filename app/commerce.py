@@ -43,7 +43,7 @@ class RequestSizeLimit:
                 return
             body.extend(message.get("body", b""))
             if len(body) > 2_000_000:
-                return await Response("Upload too large. Use a CSV under 1 MB.", status_code=413)(scope, receive, send)
+                return await Response("Upload too large. Keep uploaded files under 1 MB.", status_code=413)(scope, receive, send)
             if not message.get("more_body", False):
                 break
         sent = False
@@ -113,7 +113,15 @@ def identity(request, db):
     login = db.get(m.LoginSession, digest(token)) if token else None
     if not login or login.expires <= int(time.time()):
         raise HTTPException(401, "Please sign in to continue.")
-    return db.get(m.User, login.user_id), login
+    user = db.get(m.User, login.user_id)
+    if not user or user.closed:
+        raise HTTPException(401, "Please sign in to continue.")
+    request.state.account_user = user
+    request.state.account_db = db
+    if login.last_seen < int(time.time()) - 60:
+        login.last_seen = int(time.time())
+        db.commit()
+    return user, login
 
 
 def workspace(request, db, merchant_id, owner=False):
@@ -130,7 +138,7 @@ async def form_data(request, expected):
     origin = request.headers.get("origin")
     if origin and origin != str(request.base_url).rstrip("/"):
         raise HTTPException(403, "This form must be submitted from your Kora workspace.")
-    data = await request.form(max_files=1, max_fields=20)
+    data = await request.form(max_files=1, max_fields=50)
     csrf = str(data.get("csrf", ""))
     if not expected or not hmac.compare_digest(csrf, expected):
         raise HTTPException(403, "Your form has expired. Reload the page and try again.")
@@ -141,9 +149,13 @@ def redirect(url):
     return RedirectResponse(url, status_code=303)
 
 
-def start_session(db, user, url):
+def start_session(db, user, url, request=None):
     token = secrets.token_urlsafe(32)
-    db.add(m.LoginSession(token_hash=digest(token), user_id=user.id, csrf=secrets.token_hex(32), expires=int(time.time()) + 86400))
+    from app.commerce_account import device_name, event
+    now = int(time.time())
+    db.add(m.LoginSession(token_hash=digest(token), user_id=user.id, csrf=secrets.token_hex(32), expires=now + 86400, created_at=now, last_seen=now, device=device_name(request) if request else "Unknown device"))
+    if request:
+        event(db, user, request, "Signed in")
     db.commit()
     response = redirect(url)
     response.set_cookie("kora_session", token, httponly=True, secure=settings.env != "dev", samesite="lax", max_age=86400)
@@ -167,6 +179,13 @@ async def security_headers(request, call_next):
 async def http_error(request, exc):
     if exc.status_code == 401:
         return redirect("/login")
+    db = getattr(request.state, "account_db", None)
+    if request.method == "POST" and request.url.path.startswith("/account/") and db and not request.url.path.startswith(("/account/reset/", "/account/verify/", "/account/email-confirm/")):
+        db.rollback()
+        from app.commerce_account import page
+        path = request.url.path
+        tab = "preferences" if any(part in path for part in ("preferences", "notifications", "sidebar")) else "businesses" if any(part in path for part in ("businesses", "invitations")) else "profile" if any(part in path for part in ("profile", "avatar", "email", "verify")) else "security"
+        return page(request, db, tab, error=exc.detail, status=exc.status_code)
     return templates.TemplateResponse(request, "error.html", {"message": exc.detail}, status_code=exc.status_code)
 
 
@@ -188,9 +207,14 @@ def favicon():
 @app.get("/")
 def home(request: Request, db: Session = Depends(get_session)):
     user, login = identity(request, db)
+    from app.commerce_account import landing, preferences
+    preferred = landing(db, user)
+    if preferred:
+        return redirect(preferred)
     merchants = db.execute(select(m.Merchant, m.Membership.role).join(m.Membership).where(m.Membership.user_id == user.id)).all()
     if len(merchants) == 1:
-        return redirect(f"/app/{merchants[0][0].id}")
+        tab = preferences(db.get(m.AccountProfile, user.id))["landing"]
+        return redirect(f"/app/{merchants[0][0].id}" + ("" if tab == "overview" else "/" + tab))
     return templates.TemplateResponse(request, "businesses.html", {"user": user, "csrf": login.csrf, "merchants": merchants})
 
 
@@ -224,13 +248,19 @@ async def authenticate(request: Request, db: Session = Depends(get_session)):
         user = m.User(name=clean(data.get("name", ""), "Your name"), email=email, password_hash=hash_password(password))
         db.add(user)
         db.flush()
-    elif not user or not verify_password(password, user.password_hash):
+    elif not user or user.closed or not verify_password(password, user.password_hash):
         raise HTTPException(400, "Email or password was not recognised.")
+    else:
+        from app.commerce_account import factor, profile
+        user = db.scalar(select(m.User).where(m.User.id == user.id).with_for_update().execution_options(populate_existing=True))
+        if user.closed or not verify_password(password, user.password_hash):
+            raise HTTPException(400, "Email or password was not recognised.")
+        factor(db, profile(db, user), data.get("code", ""))
     old_token = request.cookies.get("kora_session", "")
     old_login = db.get(m.LoginSession, digest(old_token)) if old_token else None
     if old_login:
         db.delete(old_login)
-    return start_session(db, user, "/")
+    return start_session(db, user, "/", request)
 
 
 @app.post("/logout")
@@ -478,6 +508,9 @@ async def revoke_invite(request: Request, merchant_id: int, invite_id: int, db: 
     db.commit()
     return redirect(f"/app/{merchant_id}/team")
 
+# Account routes precede the older generic account-link routes.
+from app.commerce_account import router as account_router
+app.include_router(account_router)
 # Register maintenance routes after the shared authorization helpers are defined.
 from app.commerce_sprint1 import router as maintenance_router
 app.include_router(maintenance_router)

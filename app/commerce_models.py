@@ -1,5 +1,6 @@
 """Commerce milestone one. Tenant consistency is enforced by composite FKs."""
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint
+import time
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, ForeignKeyConstraint, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
@@ -11,6 +12,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(254), unique=True)
     password_hash: Mapped[str] = mapped_column(Text)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    created_at: Mapped[int] = mapped_column(Integer, default=lambda: int(time.time()), server_default="0")
+    closed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
 
 class LoginSession(Base):
@@ -19,6 +22,58 @@ class LoginSession(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id", ondelete="CASCADE"))
     csrf: Mapped[str] = mapped_column(String(64))
     expires: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_seen: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    device: Mapped[str] = mapped_column(String(160), default="Unknown device", server_default="Unknown device")
+
+
+class AccountProfile(Base):
+    __tablename__ = "commerce_account_profiles"
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(80), default="")
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    avatar: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    preferences: Mapped[str] = mapped_column(Text, default="{}")
+    totp_secret: Mapped[str] = mapped_column(Text, default="")
+    totp_pending: Mapped[str] = mapped_column(Text, default="")
+    totp_pending_expires: Mapped[int] = mapped_column(Integer, default=0)
+    totp_last_step: Mapped[int] = mapped_column(Integer, default=-1)
+
+
+class SecurityEvent(Base):
+    __tablename__ = "commerce_security_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(160))
+    at: Mapped[int] = mapped_column(Integer)
+    device: Mapped[str] = mapped_column(String(160))
+    read: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class EmailChange(Base):
+    __tablename__ = "commerce_email_changes"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"), index=True)
+    email: Mapped[str] = mapped_column(String(254))
+    previous_email: Mapped[str] = mapped_column(String(254))
+    expires: Mapped[int] = mapped_column(Integer)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class RecoveryCode(Base):
+    __tablename__ = "commerce_recovery_codes"
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"), index=True)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class BusinessNotification(Base):
+    __tablename__ = "commerce_business_notifications"
+    __table_args__ = (UniqueConstraint("user_id", "merchant_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"))
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
+    low_stock: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class LoginAttempt(Base):

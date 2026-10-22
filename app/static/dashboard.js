@@ -6,14 +6,16 @@ if (toggle) {
     toggle.setAttribute('aria-expanded', String(!collapsed));
     toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
   };
-  let saved = false;
-  try { saved = localStorage.getItem('kora-sidebar-collapsed') === 'true'; } catch {}
+  let saved = document.body.dataset.sidebar === 'collapsed';
   applySidebar(mobile.matches || saved);
   toggle.hidden = false;
   toggle.addEventListener('click', () => {
     const collapsed = !document.body.classList.contains('sidebar-collapsed');
     applySidebar(collapsed);
-    if (!mobile.matches) { saved = collapsed; try { localStorage.setItem('kora-sidebar-collapsed', String(collapsed)); } catch {} }
+    if (!mobile.matches) {
+      saved = collapsed;
+      fetch('/account/sidebar', {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({csrf:document.body.dataset.csrf,sidebar:collapsed ? 'collapsed' : 'expanded'})}).then(response => {if (response.status !== 204) announce('Sidebar changed for this page. Your preference could not be saved.');}).catch(() => announce('Sidebar changed for this page. Your preference could not be saved.'));
+    }
   });
   mobile.addEventListener('change', () => applySidebar(mobile.matches || saved));
   document.addEventListener('keydown', event => {

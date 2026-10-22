@@ -5,6 +5,7 @@
 {% if register %}<label>Your name<input name="name" autocomplete="name" maxlength="120" required placeholder="Ada Okafor"></label>{% endif %}
 <label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="you@yourbusiness.com"></label>
 <label>Password<input name="password" type="password" autocomplete="{{ 'new-password' if register else 'current-password' }}" minlength="12" maxlength="128" required aria-describedby="password-hint"></label><p class="hint" id="password-hint">Use at least 12 characters.</p>
+{% if not register %}<label>Authenticator or recovery code <small>Required only if two-factor authentication is enabled.</small><input name="code" autocomplete="one-time-code" maxlength="40"></label>{% endif %}
 <button class="button full">{{ 'Create your account' if register else 'Sign in' }}{{ icon('arrow') }}</button></form>
 {% if not register %}<p class="auth-other"><a href="/forgot-password">Forgot password?</a></p>{% endif %}<p class="auth-other">{{ 'Already have an account?' if register else 'New to Kora?' }} <a href="{{ '/login' if register else '/register' }}">{{ 'Sign in' if register else 'Create an account' }}</a></p><div class="auth-footnote">{{ icon('shield') }}Your business has its own private workspace.</div>
 </div></section></div>{% endblock %}

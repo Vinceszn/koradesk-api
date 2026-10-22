@@ -25,11 +25,25 @@ def send_account_mail(email, purpose, token):
     message = EmailMessage()
     message["From"] = os.getenv("COMMERCE_MAIL_FROM", "preview@localhost")
     message["To"] = email
-    message["Subject"] = "Verify your Kora email" if purpose == "verify" else "Reset your Kora password"
-    link = origin + "/account/" + purpose + "/" + token
-    message.set_content(("Confirm your email address" if purpose == "verify" else "Choose a new password") +
+    message["Subject"] = "Verify your Kora email" if purpose in ("verify", "email") else "Reset your Kora password"
+    link = origin + "/account/" + ("email-confirm" if purpose == "email" else purpose) + "/" + token
+    message.set_content(("Confirm your email address" if purpose in ("verify", "email") else "Choose a new password") +
                         " using this single-use link:\n\n" + link +
                         "\n\nThis link expires in 30 minutes. If you did not request it, ignore this email.")
+    deliver(message, mode)
+
+
+def send_security_notice(email, text):
+    mode, _ = configuration()
+    message = EmailMessage()
+    message["From"] = os.getenv("COMMERCE_MAIL_FROM", "preview@localhost")
+    message["To"] = email
+    message["Subject"] = "Kora account security notice"
+    message.set_content(text)
+    deliver(message, mode)
+
+
+def deliver(message, mode):
     if mode == "file":
         directory = Path(os.getenv("COMMERCE_MAIL_DIRECTORY", "work/mailbox"))
         directory.mkdir(parents=True, exist_ok=True)

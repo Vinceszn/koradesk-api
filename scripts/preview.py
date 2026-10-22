@@ -18,6 +18,12 @@ os.environ["ENV"] = "dev"
 os.environ["COMMERCE_MAIL_MODE"] = "file"
 os.environ["COMMERCE_PUBLIC_URL"] = f"http://127.0.0.1:{args.port}"
 os.environ["COMMERCE_MAIL_DIRECTORY"] = str(ROOT / "work" / "mailbox")
+if not os.getenv("COMMERCE_ACCOUNT_KEY"):
+    from cryptography.fernet import Fernet
+    key_file = ROOT / "work" / "account-encryption.key"
+    if not key_file.exists():
+        key_file.write_bytes(Fernet.generate_key())
+    os.environ["COMMERCE_ACCOUNT_KEY"] = key_file.read_text(encoding="ascii").strip()
 
 from sqlalchemy import select
 from app.db import Base, engine, SessionLocal

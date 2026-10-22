@@ -20,7 +20,7 @@ class AccountLinkRedaction(logging.Filter):
     def filter(self, record):
         if isinstance(record.args, tuple) and len(record.args) == 5:
             args = list(record.args)
-            args[2] = re.sub(r"(/account/(?:reset|verify)/)[^/?\s]+", r"\1[redacted]", str(args[2]))
+            args[2] = re.sub(r"(/account/(?:reset|verify|email-confirm)/)[^/?\s]+", r"\1[redacted]", str(args[2]))
             record.args = tuple(args)
         return True
 
@@ -62,7 +62,6 @@ def businesses(request: Request, db: Session=Depends(get_session)):
     merchants=db.execute(select(m.Merchant,m.Membership.role).join(m.Membership).where(m.Membership.user_id==user.id)).all()
     return c.templates.TemplateResponse(request,"businesses.html",dict(user=user,csrf=login.csrf,merchants=merchants))
 
-@router.get("/account")
 def account(request: Request, db: Session=Depends(get_session)):
     user,login=c.identity(request,db)
     return c.templates.TemplateResponse(request,"account.html",dict(mode="account",user=user,csrf=login.csrf))
@@ -130,6 +129,13 @@ async def consume_token(request: Request,purpose: str,raw: str,db: Session=Depen
     token=valid_token(db,purpose,raw)
     new_hash=c.hash_password(password(data.get("password",""))) if purpose=="reset" else None
     user=db.scalar(select(m.User).where(m.User.id==token.user_id).with_for_update())
+    if user.closed:
+        raise HTTPException(400,"This account link is no longer valid.")
+    if purpose == "reset":
+        from app.commerce_account import factor, profile, rate_limit, event
+        rate_limit(db, request, user.id, "recovery")
+        factor(db, profile(db, user), data.get("code", ""))
+        event(db,user,request,"Password reset")
     consumed=db.execute(update(m.AccountToken).where(m.AccountToken.token_hash==token.token_hash,m.AccountToken.used.is_(False),m.AccountToken.expires>int(time.time())).values(used=True))
     if consumed.rowcount != 1:
         raise HTTPException(409,"This account link was already used.")
@@ -148,11 +154,14 @@ async def change_password(request: Request, db: Session=Depends(get_session)):
     data=await c.form_data(request,login.csrf)
     # Refresh under lock so simultaneous changes cannot authenticate with a stale hash.
     user=db.scalar(select(m.User).where(m.User.id==user.id).with_for_update().execution_options(populate_existing=True))
-    if not c.verify_password(str(data.get("current_password","")),user.password_hash):
-        raise HTTPException(400,"Your current password was not recognised.")
+    from app.commerce_account import reauthenticate, event
+    reauthenticate(db,request,user,data)
+    if "password_confirmation" in data and data["password_confirmation"] != data.get("password"):
+        raise HTTPException(400,"The new passwords must match.")
     user.password_hash=c.hash_password(password(data.get("password","")))
     db.execute(delete(m.LoginSession).where(m.LoginSession.user_id==user.id))
     db.execute(update(m.AccountToken).where(m.AccountToken.user_id==user.id,m.AccountToken.purpose=="reset").values(used=True))
+    event(db,user,request,"Password changed")
     db.commit()
     return account_page(request,"reset-done")
 

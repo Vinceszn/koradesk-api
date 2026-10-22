@@ -1,6 +1,6 @@
 {% from 'components.html' import icon, brand %}
 <!doctype html>
-<html lang="en">
+<html lang="{{ prefs.language if prefs is defined else 'en' }}">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% block title %}Your workspace{% endblock %} · Kora Desk</title>
@@ -9,8 +9,11 @@
   <link rel="stylesheet" href="/assets/commerce.css">
   {% if merchant is defined %}<link rel="stylesheet" href="/assets/dashboard.css"><script src="/assets/dashboard.js" defer></script>{% endif %}
   <script src="/assets/commerce.js" defer></script>
+  <link rel="stylesheet" href="/assets/account.css">
+  <link rel="stylesheet" href="/assets/preferences.css">
+  <script src="/assets/preferences.js" defer></script>
 </head>
-<body class="{{ 'workspace-ui' if merchant is defined else '' }}">
+<body class="{{ 'workspace-ui' if merchant is defined else '' }} {{ 'account-ui' if account_tab is defined or (user is defined and merchant is not defined) else '' }} {{ 'sidebar-collapsed' if prefs is defined and prefs.sidebar == 'collapsed' else '' }}" data-theme="{{ prefs.theme if prefs is defined else 'dark' }}" data-density="{{ prefs.density if prefs is defined else 'comfortable' }}" data-motion="{{ 'reduced' if prefs is defined and prefs.reduced_motion else 'full' }}" data-patterns="{{ 'on' if prefs is defined and prefs.chart_patterns else 'off' }}" data-sidebar="{{ prefs.sidebar if prefs is defined else 'expanded' }}" data-csrf="{{ csrf | default('') }}" data-cards="{{ prefs.cards | join(',') if prefs is defined else 'value,units,variants,team' }}" data-error-path="{{ request.url.path if error is defined and error else '' }}" data-account-language="{{ prefs.language if prefs is defined else 'en' }}">
 <a class="skip-link" href="#main-content">Skip to content</a>
 {% if merchant is defined %}
 <aside class="sidebar" id="workspace-sidebar">
@@ -31,7 +34,7 @@
 <div class="main-shell">
   <header class="topbar">
     <button class="icon-button sidebar-toggle" aria-label="Collapse sidebar" aria-expanded="true" aria-controls="workspace-sidebar" hidden>{{ icon('overview') }}</button><div class="breadcrumb"><span>Workspace</span>{{ icon('chevron') }}<strong>{{ {'overview':'Overview','products':'Products','inventory':'Inventory','team':'Your team','settings':'Settings','customers':'Customers','suppliers':'Suppliers'}[tab] }}</strong></div>
-    <div class="account-tools"><a href="/businesses" aria-label="Switch business" class="location-chip">{{ icon('pin') }}{{ location.name }}</a><a href="/account" class="avatar user-avatar" aria-label="My account" title="{{ user.name }}">{{ user.name[:1] }}</a><form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="icon-button" title="Sign out" aria-label="Sign out">{{ icon('logout') }}</button></form></div>
+    <div class="account-tools"><a href="/businesses" aria-label="Switch business" class="location-chip">{{ icon('pin') }}{{ location.name }}</a><a href="/account" class="avatar user-avatar" aria-label="My account" title="{{ display_name | default(user.name) }}">{% if has_avatar | default(false) %}<img src="/account/avatar" alt="Your profile" width="36" height="36">{% else %}{{ (display_name | default(user.name))[:1] }}{% endif %}</a><form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="icon-button" title="Sign out" aria-label="Sign out">{{ icon('logout') }}</button></form></div>
   </header>
   <main id="main-content">
     {% if request.query_params.get('notice') %}<div class="notice" role="status">{{ icon('check') }}<span>{{ request.query_params.get('notice') }}</span></div>{% endif %}
