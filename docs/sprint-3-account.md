@@ -37,3 +37,7 @@ The full automated suite passes: **94 tests**, including 11 account-specific tes
 Real Chrome checks covered profile saving; saved theme, table density, sidebar, region and card choices across reloads; French labels; and device light/dark switching. All four tabs were checked at 1440, 768, 390 and 360 pixels with no document overflow or JavaScript errors. Screenshots were visually reviewed in dark and light themes. Working-workspace checks confirmed the saved sidebar and summary-card choices. Test data used a separate local review account; the existing merchant account and stock were preserved.
 
 One upstream Starlette/AnyIO deprecation warning remains in the test runner; it does not fail the tests.
+
+## Follow-up: navigation and usability
+
+The user's saved browser autofill exposed a false unsaved-change warning in a hidden email form. The warning and account layout were corrected and checked in the actual in-app browser. See [the account UX fix](account-ux-fix.md) for the cause, design decisions and regression evidence.

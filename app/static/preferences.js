@@ -1,3 +1,5 @@
+import { createFormTracker } from '/assets/unsaved.mjs';
+
 const accountBody = document.body;
 const failedForm = [...document.forms].find(form => document.body.dataset.errorPath && new URL(form.action).pathname === document.body.dataset.errorPath);
 if (failedForm) {
@@ -15,20 +17,22 @@ deviceTheme.addEventListener('change', () => resolveTheme(accountBody.dataset.th
 document.querySelector('[data-theme-preview]')?.addEventListener('change', event => resolveTheme(event.target.value));
 
 const dirtyForms = new Set();
+const formTrackers = new Map();
+const beforeUnload = event => { event.preventDefault(); event.returnValue = ''; };
+let unloadAttached = false;
+const updateUnload = () => {
+  if (dirtyForms.size && !unloadAttached) { window.addEventListener('beforeunload', beforeUnload); unloadAttached = true; }
+  if (!dirtyForms.size && unloadAttached) { window.removeEventListener('beforeunload', beforeUnload); unloadAttached = false; }
+};
 document.querySelectorAll('[data-unsaved]').forEach(form => {
-  const initial = new URLSearchParams(new FormData(form)).toString();
-  const update = () => {
-    const dirty = new URLSearchParams(new FormData(form)).toString() !== initial;
+  const tracker = createFormTracker(form, dirty => {
     if (dirty) dirtyForms.add(form); else dirtyForms.delete(form);
     const status = form.querySelector('[data-form-status]');
     if (status) status.textContent = dirty ? 'Unsaved changes' : '';
-  };
-  form.addEventListener('input', update);
-  form.addEventListener('change', update);
-  form.addEventListener('reset', () => {
-    dirtyForms.delete(form);
-    setTimeout(() => { update(); resolveTheme(accountBody.dataset.theme); }, 0);
+    updateUnload();
   });
+  formTrackers.set(form, tracker);
+  form.addEventListener('reset', () => resolveTheme(accountBody.dataset.theme));
   form.addEventListener('submit', event => {
     const password = form.elements.namedItem('password');
     const confirmation = form.elements.namedItem('password_confirmation');
@@ -39,11 +43,57 @@ document.querySelectorAll('[data-unsaved]').forEach(form => {
       if (event.submitter) { event.submitter.disabled = false; event.submitter.removeAttribute('aria-busy'); }
       return;
     }
-    dirtyForms.delete(form);
   });
   form.elements.namedItem('password_confirmation')?.addEventListener('input', event => event.target.setCustomValidity(''));
 });
-window.addEventListener('beforeunload', event => { if (dirtyForms.size) { event.preventDefault(); event.returnValue = ''; } });
+
+const unsavedDialog = document.getElementById('unsaved-changes');
+let pendingNavigation;
+let pendingSubmission;
+let navigationTrigger;
+if (unsavedDialog) {
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[href]');
+    if (!link || !dirtyForms.size || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.target === '_blank' || link.hasAttribute('download')) return;
+    const url = new URL(link.href);
+    if (!['http:', 'https:'].includes(url.protocol) || (url.hash && url.pathname === location.pathname && url.search === location.search)) return;
+    event.preventDefault();
+    pendingNavigation = url.href;
+    navigationTrigger = link;
+    unsavedDialog.showModal();
+  });
+  document.addEventListener('submit', event => {
+    if (event.defaultPrevented) return;
+    const form = event.target;
+    if ([...dirtyForms].some(draft => draft !== form)) {
+      event.preventDefault();
+      const button = event.submitter;
+      if (button) { button.disabled = false; button.removeAttribute('aria-busy'); }
+      pendingSubmission = {form, button};
+      navigationTrigger = button;
+      unsavedDialog.showModal();
+      return;
+    }
+    formTrackers.get(form)?.clear();
+    const status = form.querySelector('[data-form-status]');
+    if (status) status.textContent = 'Saving changes…';
+  });
+  unsavedDialog.querySelector('[data-keep-editing]').addEventListener('click', () => unsavedDialog.close());
+  unsavedDialog.querySelector('[data-discard-edits]').addEventListener('click', () => {
+    const url = pendingNavigation;
+    const submission = pendingSubmission;
+    dirtyForms.clear();
+    updateUnload();
+    unsavedDialog.close();
+    if (submission) submission.form.requestSubmit(submission.button || undefined);
+    else if (url) location.assign(url);
+  });
+  unsavedDialog.addEventListener('close', () => {
+    pendingNavigation = undefined;
+    pendingSubmission = undefined;
+    navigationTrigger?.focus();
+  });
+}
 document.querySelectorAll('[data-account-confirm]').forEach(form => form.addEventListener('submit', event => {
   if (!confirm(form.dataset.accountConfirm)) {
     event.preventDefault();
@@ -112,7 +162,7 @@ if (accountBody.dataset.accountLanguage === 'fr') {
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
       nodes.forEach(node => {
-        if (node.parentElement.closest('input, script, style, code, .business-access-title h3, .account-identity h2, .account-identity p, .security-event strong')) return;
+        if (node.parentElement.closest('input, script, style, code, .business-access-title h3, .business-access-title h4, .settings-identity strong, .settings-identity small, .security-event strong')) return;
         const source = node.textContent.trim();
         if (source && words[source]) node.textContent = node.textContent.replace(source, translate(source));
       });

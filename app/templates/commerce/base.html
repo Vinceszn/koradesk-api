@@ -11,7 +11,7 @@
   <script src="/assets/commerce.js" defer></script>
   <link rel="stylesheet" href="/assets/account.css">
   <link rel="stylesheet" href="/assets/preferences.css">
-  <script src="/assets/preferences.js" defer></script>
+  <script type="module" src="/assets/preferences.js"></script>
 </head>
 <body class="{{ 'workspace-ui' if merchant is defined else '' }} {{ 'account-ui' if account_tab is defined or (user is defined and merchant is not defined) else '' }} {{ 'sidebar-collapsed' if prefs is defined and prefs.sidebar == 'collapsed' else '' }}" data-theme="{{ prefs.theme if prefs is defined else 'dark' }}" data-density="{{ prefs.density if prefs is defined else 'comfortable' }}" data-motion="{{ 'reduced' if prefs is defined and prefs.reduced_motion else 'full' }}" data-patterns="{{ 'on' if prefs is defined and prefs.chart_patterns else 'off' }}" data-sidebar="{{ prefs.sidebar if prefs is defined else 'expanded' }}" data-csrf="{{ csrf | default('') }}" data-cards="{{ prefs.cards | join(',') if prefs is defined else 'value,units,variants,team' }}" data-error-path="{{ request.url.path if error is defined and error else '' }}" data-account-language="{{ prefs.language if prefs is defined else 'en' }}">
 <a class="skip-link" href="#main-content">Skip to content</a>
@@ -45,4 +45,5 @@
 {% else %}<main id="main-content">{% block content %}{% endblock %}</main>{% endif %}
 <dialog id="confirm-action" aria-labelledby="confirm-title"><div class="dialog-content"><span class="icon-tile pink">{{ icon('shield') }}</span><h2 id="confirm-title">Remove this access?</h2><p>This person will no longer be able to open this business. You can invite them again later.</p><div class="actions"><button class="button secondary" data-cancel>Keep access</button><button class="button danger-button" data-confirm-submit>Remove access</button></div></div></dialog>
 <span class="sr-only" id="ui-announcement" aria-live="polite"></span>
+<dialog id="unsaved-changes" aria-labelledby="unsaved-title" aria-describedby="unsaved-description"><div class="dialog-content"><h2 id="unsaved-title">You have unsaved changes</h2><p id="unsaved-description">Keep editing to save your changes, or discard them and continue.</p><div class="actions"><button type="button" class="button" data-keep-editing autofocus>Keep editing</button><button type="button" class="button secondary" data-discard-edits>Discard changes</button></div></div></dialog>
 </body></html>
