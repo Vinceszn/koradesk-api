@@ -21,9 +21,7 @@ class Shop(Base):
     plan: Mapped[str] = mapped_column(String(32), default="pilot")
     approval_limit_ngn: Mapped[int] = mapped_column(default=80000)
     stage: Mapped[str] = mapped_column(String(32), default="onboarding", index=True)
-    stage_changed_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow
-    )
+    stage_changed_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     monthly_cap: Mapped[int] = mapped_column(default=100)
     cap_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

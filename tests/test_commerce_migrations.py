@@ -1,8 +1,10 @@
 import io
 from pathlib import Path
+
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
+
 from app.config import settings
 
 
@@ -42,17 +44,24 @@ def test_migration_compiles_for_postgresql(monkeypatch):
     assert "FOREIGN KEY(variant_id, merchant_id)" in sql
     assert "CREATE TABLE shops" not in sql
 
-def test_sprint_one_upgrade_preserves_existing_account(tmp_path,monkeypatch):
-    url="sqlite:///"+(tmp_path/"existing.db").as_posix()
-    monkeypatch.setattr(settings,"database_url",url)
-    command.upgrade(config(),"0001_commerce")
-    engine=create_engine(url)
+
+def test_sprint_one_upgrade_preserves_existing_account(tmp_path, monkeypatch):
+    url = "sqlite:///" + (tmp_path / "existing.db").as_posix()
+    monkeypatch.setattr(settings, "database_url", url)
+    command.upgrade(config(), "0001_commerce")
+    engine = create_engine(url)
     with engine.begin() as connection:
-        connection.execute(text("INSERT INTO commerce_users (id,name,email,password_hash) VALUES (1,'Existing','existing@example.com','preserved-hash')"))
-    command.upgrade(config(),"head")
+        connection.execute(
+            text(
+                "INSERT INTO commerce_users (id,name,email,password_hash) VALUES (1,'Existing','existing@example.com','preserved-hash')"
+            )
+        )
+    command.upgrade(config(), "head")
     with engine.connect() as connection:
-        row=connection.execute(text("SELECT password_hash,email_verified FROM commerce_users WHERE id=1")).one()
-        assert row[0]=="preserved-hash" and not row[1]
+        row = connection.execute(
+            text("SELECT password_hash,email_verified FROM commerce_users WHERE id=1")
+        ).one()
+        assert row[0] == "preserved-hash" and not row[1]
     engine.dispose()
 
 
@@ -74,7 +83,11 @@ def test_inventory_upgrade_preserves_stock_and_ledger(tmp_path, monkeypatch):
             connection.execute(text(sql))
     command.upgrade(config(), "head")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT on_hand,reserved,counted,version,low_stock_threshold FROM commerce_balances")).one() == (12, 2, 1, 1, 0)
+        assert connection.execute(
+            text(
+                "SELECT on_hand,reserved,counted,version,low_stock_threshold FROM commerce_balances"
+            )
+        ).one() == (12, 2, 1, 1, 0)
         assert connection.scalar(text("SELECT SUM(quantity) FROM commerce_movements")) == 12
     command.downgrade(config(), "0002_account_catalogue")
     with engine.connect() as connection:

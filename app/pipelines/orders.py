@@ -112,7 +112,5 @@ async def handle_customer_message(
     else:
         order.status = "confirmed"
         session.commit()
-        await whatsapp.send_text(
-            sender, format_draft(customer, priced, total, f"OD-{order.id}")
-        )
+        await whatsapp.send_text(sender, format_draft(customer, priced, total, f"OD-{order.id}"))
     costs.log_meta_message(session, shop.id)

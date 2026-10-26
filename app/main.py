@@ -8,13 +8,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import approvals, caps, costs, models, whatsapp
+from app.admin import router as admin_router
 from app.config import settings
 from app.db import get_session, init_db
 from app.pipelines import orders, payments
 from app.scheduler import start as start_scheduler
 from app.security import verify_signature
-
-from app.admin import router as admin_router
 
 app = FastAPI(title="Kora Desk API")
 app.include_router(admin_router)
@@ -54,9 +53,7 @@ def _shop_for(session: Session, business_number: str) -> models.Shop | None:
     ).scalar_one_or_none()
 
 
-async def _handle_button(
-    session: Session, shop: models.Shop, sender: str, button_id: str
-) -> None:
+async def _handle_button(session: Session, shop: models.Shop, sender: str, button_id: str) -> None:
     try:
         action, _kind, approval_id = button_id.split(":")
     except ValueError:
@@ -71,7 +68,9 @@ async def _handle_button(
     if before == "pending" and approval.status != "pending":
         await whatsapp.send_text(
             sender,
-            "Approved. Logged and queued." if approval.status == "approved" else "Rejected. Nothing moved — tell me what to change.",
+            "Approved. Logged and queued."
+            if approval.status == "approved"
+            else "Rejected. Nothing moved — tell me what to change.",
         )
         costs.log_meta_message(session, shop.id)
 
@@ -127,10 +126,9 @@ async def receive(request: Request, session: Session = Depends(get_session)) -> 
                     msg_type == "interactive"
                     and message.get("interactive", {}).get("type") == "button_reply"
                 ):
-                    button_id = (
-                        message.get("button", {}).get("payload", "")
-                        or message.get("interactive", {}).get("button_reply", {}).get("id", "")
-                    )
+                    button_id = message.get("button", {}).get("payload", "") or message.get(
+                        "interactive", {}
+                    ).get("button_reply", {}).get("id", "")
                     await _handle_button(session, shop, sender, button_id)
                     continue
                 if _capped(session, shop, sender):

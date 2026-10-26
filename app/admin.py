@@ -87,9 +87,7 @@ def shops(request: Request, q: str = ""):
 
 
 @router.post("/shops")
-def create_shop(
-    name: str = Form(...), whatsapp_number: str = Form(...), plan: str = Form("pilot")
-):
+def create_shop(name: str = Form(...), whatsapp_number: str = Form(...), plan: str = Form("pilot")):
     plan = plan if plan in VALID_PLANS else "pilot"
     session = _session()
     try:
@@ -243,7 +241,9 @@ def add_price(
     try:
         session.add(
             models.PriceListItem(
-                shop_id=shop_id, name=name.strip(), unit=unit.strip() or "each",
+                shop_id=shop_id,
+                name=name.strip(),
+                unit=unit.strip() or "each",
                 price_ngn=price_ngn,
             )
         )
@@ -359,8 +359,14 @@ def money_tab(request: Request, shop_id: int, tab: str, status: str = "", page: 
         return templates.TemplateResponse(
             request,
             "admin_money.html",
-            {"shop": shop, "tab": tab, "rows": rows, "status": status,
-             "page": page, "actor": operator_actor()},
+            {
+                "shop": shop,
+                "tab": tab,
+                "rows": rows,
+                "status": status,
+                "page": page,
+                "actor": operator_actor(),
+            },
         )
     finally:
         session.close()
@@ -394,9 +400,7 @@ def leads(request: Request):
     session = _session()
     try:
         rows = list(
-            session.execute(
-                select(models.Lead).order_by(desc(models.Lead.created_at))
-            ).scalars()
+            session.execute(select(models.Lead).order_by(desc(models.Lead.created_at))).scalars()
         )
         return templates.TemplateResponse(
             request,

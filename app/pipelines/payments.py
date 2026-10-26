@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import costs, models, whatsapp
-from app.matching import AUTO_CLEAR_THRESHOLD, parse_amount_naira, payment_match_score
+from app.matching import parse_amount_naira, payment_match_score
 
 
 def open_invoices(session: Session, shop_id: int) -> list[models.Invoice]:
@@ -34,16 +34,15 @@ async def handle_bank_alert(
     amount = parse_amount_naira(alert_text)
     if amount is None:
         await whatsapp.send_text(
-            sender, "I saw a transfer alert but could not read the amount. Please forward it as text."
+            sender,
+            "I saw a transfer alert but could not read the amount. Please forward it as text.",
         )
         costs.log_meta_message(session, shop.id)
         return
 
     best, best_score = None, 0.0
     for invoice in open_invoices(session, shop.id):
-        score = payment_match_score(
-            amount, sender, invoice.amount_ngn, "", same_day=True
-        )
+        score = payment_match_score(amount, sender, invoice.amount_ngn, "", same_day=True)
         if score > best_score:
             best, best_score = invoice, score
 
