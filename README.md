@@ -27,7 +27,7 @@ Use Python 3.13 (matching the Docker runtime). Run these commands from the repos
 
 ```powershell
 python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install --require-hashes -r requirements.txt
 .venv\Scripts\python scripts/preview.py --seed
 ```
 
@@ -35,7 +35,7 @@ python -m venv .venv
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install --require-hashes -r requirements.txt
 .venv/bin/python scripts/preview.py --seed
 ```
 
@@ -119,13 +119,16 @@ SMTP uses certificate-verified STARTTLS. File mode is restricted to development 
 
 ## Tests
 
-After installing requirements, run with the virtual environment's Python:
+Install the development lockfile (which includes runtime dependencies), then run with the virtual environment's Python:
 
 ```bash
+python -m pip install --require-hashes -r requirements-dev.txt
 python -m pytest -q
+python -m ruff check .
+python -m ruff format --check .
 ```
 
-The suite uses isolated local test databases and does not need live WhatsApp or payment credentials. Local SQLite tests and PostgreSQL SQL-compilation checks do not establish production PostgreSQL concurrency behavior.
+The fast suite uses isolated SQLite databases and does not need live WhatsApp or payment credentials. Live PostgreSQL tests skip unless `TEST_DATABASE_URL` is set. CI requires these tests on PostgreSQL 16 and 17; they execute migrations, tenant constraints, row locking, and HTTP inventory transactions against migrated tables. See [engineering checks](docs/engineering-foundation.md) for local PostgreSQL setup, dependency locking/auditing, configuration validation, and coverage limits.
 
 ## Run the legacy WhatsApp/admin service
 
