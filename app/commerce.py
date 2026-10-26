@@ -311,8 +311,11 @@ def dashboard(request: Request, merchant_id: int, tab: str = "overview", db: Ses
     if tab == "import":
         workspace(request, db, merchant_id, owner=True)
         return redirect(f"/app/{merchant_id}/products#catalogue-import")
-    if tab not in ("overview", "products", "inventory", "team", "settings", "customers", "suppliers"):
+    if tab not in ("overview", "orders", "products", "inventory", "team", "settings", "customers", "suppliers"):
         raise HTTPException(404, "Page not found.")
+    if tab == "orders":
+        from app.commerce_orders import orders_page
+        return orders_page(request, db, merchant_id)
     if tab in ("inventory", "suppliers"):
         if tab == "suppliers":
             workspace(request, db, merchant_id, owner=True)
@@ -516,3 +519,5 @@ from app.commerce_sprint1 import router as maintenance_router
 app.include_router(maintenance_router)
 from app.commerce_inventory import router as inventory_router
 app.include_router(inventory_router)
+from app.commerce_orders import router as orders_router
+app.include_router(orders_router)

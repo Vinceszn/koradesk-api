@@ -32,7 +32,7 @@ DEFAULTS = dict(theme="dark", sidebar="expanded", density="comfortable", timezon
                 cards=["value", "units", "variants", "team"])
 CHOICES = dict(theme=("dark", "light", "system"), sidebar=("expanded", "collapsed"),
                density=("comfortable", "compact"), date_format=("dmy", "mdy", "iso"),
-               clock=("12", "24"), language=("en", "fr"), landing=("overview", "products", "inventory"))
+               clock=("12", "24"), language=("en", "fr"), landing=("overview", "orders", "products", "inventory"))
 
 
 def profile(db, user):

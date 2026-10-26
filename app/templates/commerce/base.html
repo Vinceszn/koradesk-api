@@ -8,6 +8,7 @@
   <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/commerce.css">
   {% if merchant is defined %}<link rel="stylesheet" href="/assets/dashboard.css"><script src="/assets/dashboard.js" defer></script>{% endif %}
+  {% if tab is defined and tab == 'orders' %}<link rel="stylesheet" href="/assets/orders.css"><script src="/assets/orders.js" defer></script>{% endif %}
   <script src="/assets/commerce.js" defer></script>
   <link rel="stylesheet" href="/assets/account.css">
   <link rel="stylesheet" href="/assets/preferences.css">
@@ -21,7 +22,7 @@
   <div class="business-chip"><span class="avatar business-avatar">{{ merchant.name[:1] }}</span><div><strong>{{ merchant.name }}</strong><small>{{ membership.role | capitalize }} workspace</small></div></div>
   <p class="nav-label">WORKSPACE</p>
   <nav aria-label="Main navigation">
-    {% for key,label,symbol in [('overview','Overview','overview'),('products','Products','box'),('inventory','Inventory','stock'),('suppliers','Suppliers','store'),('team','Your team','team'),('customers','Customers','team'),('settings','Settings','shield')] %}
+    {% for key,label,symbol in [('overview','Overview','overview'),('orders','Orders','receipt'),('products','Products','box'),('inventory','Inventory','stock'),('suppliers','Suppliers','store'),('team','Your team','team'),('customers','Customers','team'),('settings','Settings','shield')] %}
     {% if key not in ['settings','customers','suppliers'] or membership.role == 'owner' %}<a aria-label="{{ label }}" title="{{ label }}" class="nav-item {% if tab == key %}active{% endif %}" {% if tab == key %}aria-current="page"{% endif %} href="/app/{{ merchant.id }}{% if key != 'overview' %}/{{ key }}{% endif %}">{{ icon(symbol) }}<span>{{ label }}</span>{% if key == 'team' %}<span class="nav-count">{{ members | length }}</span>{% endif %}</a>{% endif %}
     {% endfor %}
   </nav>
@@ -33,7 +34,7 @@
 </aside>
 <div class="main-shell">
   <header class="topbar">
-    <button class="icon-button sidebar-toggle" aria-label="Collapse sidebar" aria-expanded="true" aria-controls="workspace-sidebar" hidden>{{ icon('overview') }}</button><div class="breadcrumb"><span>Workspace</span>{{ icon('chevron') }}<strong>{{ {'overview':'Overview','products':'Products','inventory':'Inventory','team':'Your team','settings':'Settings','customers':'Customers','suppliers':'Suppliers'}[tab] }}</strong></div>
+    <button class="icon-button sidebar-toggle" aria-label="Collapse sidebar" aria-expanded="true" aria-controls="workspace-sidebar" hidden>{{ icon('overview') }}</button><div class="breadcrumb"><span>Workspace</span>{{ icon('chevron') }}<strong>{{ {'overview':'Overview','orders':'Orders','products':'Products','inventory':'Inventory','team':'Your team','settings':'Settings','customers':'Customers','suppliers':'Suppliers'}[tab] }}</strong></div>
     <div class="account-tools"><a href="/businesses" aria-label="Switch business" class="location-chip">{{ icon('pin') }}{{ location.name }}</a><a href="/account" class="avatar user-avatar" aria-label="My account" title="{{ display_name | default(user.name) }}">{% if has_avatar | default(false) %}<img src="/account/avatar" alt="Your profile" width="36" height="36">{% else %}{{ (display_name | default(user.name))[:1] }}{% endif %}</a><form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="icon-button" title="Sign out" aria-label="Sign out">{{ icon('logout') }}</button></form></div>
   </header>
   <main id="main-content">

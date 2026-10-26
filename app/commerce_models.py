@@ -234,3 +234,111 @@ class StockOperation(Base):
     unit_cost_kobo: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reference: Mapped[str] = mapped_column(String(120), default="")
     reverses_id: Mapped[int | None] = mapped_column(ForeignKey("commerce_movements.id"), unique=True, nullable=True)
+
+
+class CommerceOrder(Base):
+    __tablename__ = "commerce_orders"
+    __table_args__ = (
+        UniqueConstraint("id", "merchant_id"),
+        UniqueConstraint("merchant_id", "reference"),
+        ForeignKeyConstraint(["location_id", "merchant_id"], ["commerce_locations.id", "commerce_locations.merchant_id"]),
+        ForeignKeyConstraint(["customer_id", "merchant_id"], ["commerce_customers.id", "commerce_customers.merchant_id"]),
+        CheckConstraint("order_status IN ('draft','placed','completed','cancelled','expired')"),
+        CheckConstraint("payment_status IN ('unpaid','partially_paid','paid','partially_refunded','refunded')"),
+        CheckConstraint("fulfilment_status IN ('unfulfilled','partially_fulfilled','fulfilled','cancelled')"),
+        CheckConstraint("subtotal_kobo >= 0 AND total_kobo >= 0"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    location_id: Mapped[int] = mapped_column(Integer)
+    reference: Mapped[str] = mapped_column(String(24))
+    customer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_name: Mapped[str] = mapped_column(String(120), default="")
+    customer_email: Mapped[str] = mapped_column(String(254), default="")
+    customer_phone: Mapped[str] = mapped_column(String(40), default="")
+    order_status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    payment_status: Mapped[str] = mapped_column(String(24), default="unpaid", index=True)
+    fulfilment_status: Mapped[str] = mapped_column(String(24), default="unfulfilled", index=True)
+    subtotal_kobo: Mapped[int] = mapped_column(Integer, default=0)
+    total_kobo: Mapped[int] = mapped_column(Integer, default=0)
+    reserved_until: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"))
+    created_at: Mapped[int] = mapped_column(Integer)
+    updated_at: Mapped[int] = mapped_column(Integer)
+    placed_at: Mapped[int] = mapped_column(Integer, default=0)
+    cancelled_at: Mapped[int] = mapped_column(Integer, default=0)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class OrderItem(Base):
+    __tablename__ = "commerce_order_items"
+    __table_args__ = (
+        UniqueConstraint("id", "merchant_id"),
+        UniqueConstraint("order_id", "variant_id"),
+        ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+        ForeignKeyConstraint(["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]),
+        CheckConstraint("quantity > 0 AND unit_price_kobo >= 0 AND line_total_kobo >= 0"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    order_id: Mapped[int] = mapped_column(Integer, index=True)
+    variant_id: Mapped[int] = mapped_column(Integer)
+    product_name: Mapped[str] = mapped_column(String(160))
+    variant_label: Mapped[str] = mapped_column(String(120))
+    sku: Mapped[str] = mapped_column(String(64))
+    quantity: Mapped[int] = mapped_column(Integer)
+    unit_price_kobo: Mapped[int] = mapped_column(Integer)
+    line_total_kobo: Mapped[int] = mapped_column(Integer)
+
+
+class StockReservation(Base):
+    __tablename__ = "commerce_stock_reservations"
+    __table_args__ = (
+        UniqueConstraint("id", "merchant_id"),
+        UniqueConstraint("order_item_id"),
+        ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+        ForeignKeyConstraint(["order_item_id", "merchant_id"], ["commerce_order_items.id", "commerce_order_items.merchant_id"]),
+        ForeignKeyConstraint(["location_id", "merchant_id"], ["commerce_locations.id", "commerce_locations.merchant_id"]),
+        ForeignKeyConstraint(["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]),
+        CheckConstraint("quantity > 0"),
+        CheckConstraint("state IN ('active','released','consumed','expired')"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    order_id: Mapped[int] = mapped_column(Integer, index=True)
+    order_item_id: Mapped[int] = mapped_column(Integer)
+    location_id: Mapped[int] = mapped_column(Integer)
+    variant_id: Mapped[int] = mapped_column(Integer)
+    quantity: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    created_at: Mapped[int] = mapped_column(Integer)
+    transitioned_at: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class OrderEvent(Base):
+    __tablename__ = "commerce_order_events"
+    __table_args__ = (
+        ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    order_id: Mapped[int] = mapped_column(Integer, index=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("commerce_users.id"), nullable=True)
+    event_type: Mapped[str] = mapped_column(String(40))
+    details: Mapped[str] = mapped_column(String(300), default="")
+    at: Mapped[int] = mapped_column(Integer)
+
+
+class OrderRequest(Base):
+    __tablename__ = "commerce_order_requests"
+    __table_args__ = (
+        UniqueConstraint("merchant_id", "request_key"),
+        ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    order_id: Mapped[int] = mapped_column(Integer)
+    request_key: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[str] = mapped_column(String(20))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[int] = mapped_column(Integer)
