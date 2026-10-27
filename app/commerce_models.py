@@ -1,5 +1,6 @@
 """Commerce milestone one. Tenant consistency is enforced by composite FKs."""
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint
+import time
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, ForeignKeyConstraint, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
@@ -11,6 +12,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(254), unique=True)
     password_hash: Mapped[str] = mapped_column(Text)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    created_at: Mapped[int] = mapped_column(Integer, default=lambda: int(time.time()), server_default="0")
+    closed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
 
 class LoginSession(Base):
@@ -19,6 +22,58 @@ class LoginSession(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id", ondelete="CASCADE"))
     csrf: Mapped[str] = mapped_column(String(64))
     expires: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_seen: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    device: Mapped[str] = mapped_column(String(160), default="Unknown device", server_default="Unknown device")
+
+
+class AccountProfile(Base):
+    __tablename__ = "commerce_account_profiles"
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(80), default="")
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    avatar: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    preferences: Mapped[str] = mapped_column(Text, default="{}")
+    totp_secret: Mapped[str] = mapped_column(Text, default="")
+    totp_pending: Mapped[str] = mapped_column(Text, default="")
+    totp_pending_expires: Mapped[int] = mapped_column(Integer, default=0)
+    totp_last_step: Mapped[int] = mapped_column(Integer, default=-1)
+
+
+class SecurityEvent(Base):
+    __tablename__ = "commerce_security_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(160))
+    at: Mapped[int] = mapped_column(Integer)
+    device: Mapped[str] = mapped_column(String(160))
+    read: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class EmailChange(Base):
+    __tablename__ = "commerce_email_changes"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"), index=True)
+    email: Mapped[str] = mapped_column(String(254))
+    previous_email: Mapped[str] = mapped_column(String(254))
+    expires: Mapped[int] = mapped_column(Integer)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class RecoveryCode(Base):
+    __tablename__ = "commerce_recovery_codes"
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"), index=True)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class BusinessNotification(Base):
+    __tablename__ = "commerce_business_notifications"
+    __table_args__ = (UniqueConstraint("user_id", "merchant_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"))
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
+    low_stock: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class LoginAttempt(Base):
@@ -179,3 +234,111 @@ class StockOperation(Base):
     unit_cost_kobo: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reference: Mapped[str] = mapped_column(String(120), default="")
     reverses_id: Mapped[int | None] = mapped_column(ForeignKey("commerce_movements.id"), unique=True, nullable=True)
+
+
+class CommerceOrder(Base):
+    __tablename__ = "commerce_orders"
+    __table_args__ = (
+        UniqueConstraint("id", "merchant_id"),
+        UniqueConstraint("merchant_id", "reference"),
+        ForeignKeyConstraint(["location_id", "merchant_id"], ["commerce_locations.id", "commerce_locations.merchant_id"]),
+        ForeignKeyConstraint(["customer_id", "merchant_id"], ["commerce_customers.id", "commerce_customers.merchant_id"]),
+        CheckConstraint("order_status IN ('draft','placed','completed','cancelled','expired')"),
+        CheckConstraint("payment_status IN ('unpaid','partially_paid','paid','partially_refunded','refunded')"),
+        CheckConstraint("fulfilment_status IN ('unfulfilled','partially_fulfilled','fulfilled','cancelled')"),
+        CheckConstraint("subtotal_kobo >= 0 AND total_kobo >= 0"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    location_id: Mapped[int] = mapped_column(Integer)
+    reference: Mapped[str] = mapped_column(String(24))
+    customer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_name: Mapped[str] = mapped_column(String(120), default="")
+    customer_email: Mapped[str] = mapped_column(String(254), default="")
+    customer_phone: Mapped[str] = mapped_column(String(40), default="")
+    order_status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    payment_status: Mapped[str] = mapped_column(String(24), default="unpaid", index=True)
+    fulfilment_status: Mapped[str] = mapped_column(String(24), default="unfulfilled", index=True)
+    subtotal_kobo: Mapped[int] = mapped_column(Integer, default=0)
+    total_kobo: Mapped[int] = mapped_column(Integer, default=0)
+    reserved_until: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"))
+    created_at: Mapped[int] = mapped_column(Integer)
+    updated_at: Mapped[int] = mapped_column(Integer)
+    placed_at: Mapped[int] = mapped_column(Integer, default=0)
+    cancelled_at: Mapped[int] = mapped_column(Integer, default=0)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class OrderItem(Base):
+    __tablename__ = "commerce_order_items"
+    __table_args__ = (
+        UniqueConstraint("id", "merchant_id"),
+        UniqueConstraint("order_id", "variant_id"),
+        ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+        ForeignKeyConstraint(["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]),
+        CheckConstraint("quantity > 0 AND unit_price_kobo >= 0 AND line_total_kobo >= 0"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    order_id: Mapped[int] = mapped_column(Integer, index=True)
+    variant_id: Mapped[int] = mapped_column(Integer)
+    product_name: Mapped[str] = mapped_column(String(160))
+    variant_label: Mapped[str] = mapped_column(String(120))
+    sku: Mapped[str] = mapped_column(String(64))
+    quantity: Mapped[int] = mapped_column(Integer)
+    unit_price_kobo: Mapped[int] = mapped_column(Integer)
+    line_total_kobo: Mapped[int] = mapped_column(Integer)
+
+
+class StockReservation(Base):
+    __tablename__ = "commerce_stock_reservations"
+    __table_args__ = (
+        UniqueConstraint("id", "merchant_id"),
+        UniqueConstraint("order_item_id"),
+        ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+        ForeignKeyConstraint(["order_item_id", "merchant_id"], ["commerce_order_items.id", "commerce_order_items.merchant_id"]),
+        ForeignKeyConstraint(["location_id", "merchant_id"], ["commerce_locations.id", "commerce_locations.merchant_id"]),
+        ForeignKeyConstraint(["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]),
+        CheckConstraint("quantity > 0"),
+        CheckConstraint("state IN ('active','released','consumed','expired')"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    order_id: Mapped[int] = mapped_column(Integer, index=True)
+    order_item_id: Mapped[int] = mapped_column(Integer)
+    location_id: Mapped[int] = mapped_column(Integer)
+    variant_id: Mapped[int] = mapped_column(Integer)
+    quantity: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    created_at: Mapped[int] = mapped_column(Integer)
+    transitioned_at: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class OrderEvent(Base):
+    __tablename__ = "commerce_order_events"
+    __table_args__ = (
+        ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    order_id: Mapped[int] = mapped_column(Integer, index=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("commerce_users.id"), nullable=True)
+    event_type: Mapped[str] = mapped_column(String(40))
+    details: Mapped[str] = mapped_column(String(300), default="")
+    at: Mapped[int] = mapped_column(Integer)
+
+
+class OrderRequest(Base):
+    __tablename__ = "commerce_order_requests"
+    __table_args__ = (
+        UniqueConstraint("merchant_id", "request_key"),
+        ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"), index=True)
+    order_id: Mapped[int] = mapped_column(Integer)
+    request_key: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[str] = mapped_column(String(20))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[int] = mapped_column(Integer)

@@ -7,7 +7,11 @@
 {% elif mode == 'forgot' %}
 <h1>Reset your password</h1><p>Enter your account email. If an account matches, we’ll send a reset link.</p><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Email address<input type="email" name="email" autocomplete="email" maxlength="254" required></label><button class="button">Send reset link</button></form>
 {% elif mode == 'reset' %}
-<h1>Choose a new password</h1><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>New password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><p class="hint">Use 12–128 characters. This will sign out all existing sessions.</p><button class="button">Save new password</button></form>
+<h1>Choose a new password</h1><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>New password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><p class="hint">Use 12–128 characters. This will sign out all existing sessions.</p><label>Authenticator or recovery code<small>Required if two-factor authentication is enabled.</small><input name="code" autocomplete="one-time-code" maxlength="40"></label><button class="button">Save new password</button></form>
+{% elif mode == 'email-confirm' %}
+<h1>Confirm your new email</h1><p>Replace your sign-in address with {{ target_email }}. Existing sessions will be signed out.</p><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Current password<input name="current_password" type="password" autocomplete="current-password" required></label><label>Authenticator or recovery code<small>Required if two-factor authentication is enabled.</small><input name="code" autocomplete="one-time-code" maxlength="40"></label><button class="button">Confirm email change</button></form>
+{% elif mode == 'email-done' %}
+<h1>Email address updated</h1><p>Sign in with your verified new address. Previous account links and sessions have been revoked.</p>
 {% elif mode == 'verify' %}
 <h1>Confirm your email</h1><p>Confirm that you own the email address that received this link.</p><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button">Verify email</button></form>
 {% elif mode == 'sent' %}

@@ -1,23 +1,25 @@
 # Kora Desk API
 
-Kora Desk is a merchant workspace for managing a business, product catalogue, customers, suppliers, and inventory. This repository contains the merchant web application and a separate legacy WhatsApp/internal-admin service.
+Kora Desk is a merchant workspace for managing a business, product catalogue, customers, suppliers, inventory, and orders. This repository contains the merchant web application and a separate legacy WhatsApp/internal-admin service.
 
-**Current stage:** Sprints 1 and 2 are implemented and locally verified. Sprint 3 (orders and reservations) is next. Sales, payments, receipts, and a production pilot are still planned.
+**Current stage:** Sprints 1–4 are implemented and locally verified. Walk-in sales, fulfilment, provider payments, receipts, and a production pilot are still planned.
 
 ## What is available
 
 | Area | Built functionality |
 |---|---|
-| Accounts | Registration, sign-in/out, email verification, password recovery and password changes |
+| Accounts | Profile/photo, secure email changes, password recovery, two-factor authentication, session controls, security history, personal data export and closure |
+| Preferences | Appearance, navigation, table density, regional dates, account/navigation language, notification choices and overview cards |
 | Businesses | Business setup, settings, and switching between businesses |
 | Team | Owner and read-only staff access, invitations and replacement invitations |
 | Catalogue | Products and variants, SKU/pricing edits, archive/restore, CSV import and export |
 | Customers | Basic customer records |
 | Suppliers | Supplier records and supplier details captured on stock receipts |
 | Inventory | Opening counts, receiving, purchase costs, adjustments, recounts, reversals, reconciliation, low-stock indicators, and paginated movement history |
+| Orders | Drafts, customer and item snapshots, server totals, atomic stock reservations, independent statuses, cancellation, unpaid expiry, search and filters |
 | Overview | Stock summaries and charts, with collapsible navigation |
 
-The [latest feature audit](docs/feature-audit.md) records 83 passing automated tests and three browser walkthroughs. These are local verification results, not evidence of production readiness. Live email delivery and production PostgreSQL checks remain outstanding.
+The [Sprints 1–2 feature audit](docs/feature-audit.md) records 83 passing tests and three browser walkthroughs. The [account sprint](docs/sprint-3-account.md) raised the suite to 94 tests. [Sprint 4](docs/sprint-4-orders.md) brings it to 101 passing tests and adds a responsive real-browser order walkthrough. These are local verification results, not evidence of production readiness. Live email delivery and production PostgreSQL contention checks remain outstanding.
 
 ## Run the merchant preview
 
@@ -83,11 +85,23 @@ Classic T-shirt,Medium,TSHIRT-M,7500.00
 
 Receiving currently handles one variant at a time; multi-item receiving is pending. Low-stock indicators appear inside the app. Stock value based on selling prices is not a profit or accounting report.
 
+## Orders and reservation expiry
+
+Owners can save and edit draft orders, then place the complete order to reserve stock for 30 minutes. Placement rechecks every price and available quantity in one transaction. Staff may review orders but cannot change them in Sprint 4. Payment collection and fulfilment arrive in later sprints.
+
+Run the retry-safe expiry task on a regular schedule so overdue unpaid reservations release promptly:
+
+```bash
+python scripts/expire_orders.py
+```
+
+The merchant pages also expire due reservations when an order list or detail page is opened. The scheduled task remains required in production so expiry does not depend on page traffic.
+
 ## Two separate applications
 
 | Application | Entry point | Purpose | Default local port |
 |---|---|---|---|
-| Merchant workspace | `app.commerce:app` | Merchant accounts, catalogue, customers, suppliers, and stock | 8010 via the preview script |
+| Merchant workspace | `app.commerce:app` | Merchant accounts, catalogue, customers, suppliers, stock, and orders | 8010 via the preview script |
 | Legacy service | `app.main:app` | WhatsApp webhooks, legacy pipelines, scheduled jobs, and internal admin | 8000 via Docker Compose |
 
 Merchant businesses are not automatically connected to legacy shops, orders, payments, or WhatsApp conversations. That integration is planned for a later sprint.
@@ -114,6 +128,8 @@ Account email settings are read directly from the **process environment**. Addin
 | `COMMERCE_SMTP_PORT` | SMTP port, default `587` |
 | `COMMERCE_SMTP_USER` / `COMMERCE_SMTP_PASSWORD` | Authentication credentials when required by the mail server |
 | `COMMERCE_MAIL_DIRECTORY` | Private output directory for local file-mode emails |
+
+Two-factor secrets require `COMMERCE_ACCOUNT_KEY` in the process environment: a stable Fernet key generated with `Fernet.generate_key()`. Keep and back it up separately from the database. The local preview generates a private key at `work/account-encryption.key`; preserve it across preview restarts. Never commit this key.
 
 SMTP uses certificate-verified STARTTLS. File mode is restricted to development with a loopback HTTP origin. Before deployment, configure `ENV=prod`, HTTPS and trusted proxy handling, protect logs containing account links, and complete the production gates in the sprint plan.
 
@@ -154,6 +170,8 @@ Legacy operational emails use `ADMIN_EMAILS` and `SMTP_HOST`, `SMTP_PORT`, `SMTP
 | Path | Purpose |
 |---|---|
 | `app/commerce.py` | Merchant application and routes |
+| `app/commerce_account.py` | Personal account, preferences, access and security controls |
+| `app/commerce_orders.py` | Order drafts, reservation lifecycle and order directory |
 | `app/commerce_mail.py` | Merchant account email delivery |
 | `app/main.py` | Legacy WhatsApp/admin application |
 | `app/config.py` | Shared application settings |
@@ -162,6 +180,7 @@ Legacy operational emails use `ADMIN_EMAILS` and `SMTP_HOST`, `SMTP_PORT`, `SMTP
 | `app/templates/` | Server-rendered pages |
 | `alembic.ini` | Database migration configuration |
 | `scripts/preview.py` | Isolated merchant preview launcher |
+| `scripts/expire_orders.py` | Scheduled unpaid-reservation expiry task |
 | `tests/` | Automated checks |
 | `docs/` | Delivery plan, sprint notes, UI notes, and audit records |
 
@@ -171,13 +190,14 @@ Legacy operational emails use `ADMIN_EMAILS` and `SMTP_HOST`, `SMTP_PORT`, `SMTP
 |---|---|---|
 | 1 | Accounts, business settings, catalogue maintenance, customers | Implemented; live email setup pending |
 | 2 | Suppliers, receiving, stock corrections, reconciliation, low-stock indicators | Implemented; production PostgreSQL checks pending |
-| 3 | Orders and stock reservations | Next |
-| 4 | Walk-in sales and fulfilment | Planned |
-| 5 | Provider payments | Planned |
-| 6 | Receipts, returns, and refunds | Planned |
-| 7 | Reporting and operator tools | Planned |
-| 8 | Production hardening and controlled pilot | Planned |
-| 9 | Hosted storefront | After pilot |
-| 10 | WhatsApp commerce integration | After pilot |
+| 3 | Personal account, security and customization | Implemented and locally verified; live email and production checks pending |
+| 4 | Orders and stock reservations | Implemented and locally verified; production PostgreSQL contention checks pending |
+| 5 | Walk-in sales and fulfilment | Planned |
+| 6 | Provider payments | Planned |
+| 7 | Receipts, returns, and refunds | Planned |
+| 8 | Reporting and operator tools | Planned |
+| 9 | Production hardening and controlled pilot | Planned |
+| 10 | Hosted storefront | After pilot |
+| 11 | WhatsApp commerce integration | After pilot |
 
-See the [full sprint plan](docs/sprint-plan.md), [Sprint 1 notes](docs/sprint-1.md), [Sprint 2 notes](docs/sprint-2.md), [feature audit](docs/feature-audit.md), and [sprint checkpoint](docs/sprint-checkpoint.md) for scope and evidence. Earlier milestone and design documents are historical snapshots; their feature counts and pending-work lists may describe an older stage.
+See the [full sprint plan](docs/sprint-plan.md), [Sprint 1 notes](docs/sprint-1.md), [Sprint 2 notes](docs/sprint-2.md), [account sprint notes](docs/sprint-3-account.md), [Sprint 4 orders and barcode POS handoff](docs/sprint-4-orders.md), [feature audit](docs/feature-audit.md), and [sprint checkpoint](docs/sprint-checkpoint.md) for scope and evidence. Earlier milestone and design documents are historical snapshots; their feature counts and pending-work lists may describe an older stage.
