@@ -96,18 +96,16 @@ def touch_conversation(session: Session, shop_id: int, customer_key: str) -> mod
 def mtd_spend(session: Session, shop_id: int, month: str | None = None) -> dict:
     month = month or month_key()
     start_day, end_day = f"{month}-01", _month_range(month)[1].strftime("%Y-%m-%d")
-    meta, ai = (
-        session.execute(
-            select(
-                func.coalesce(func.sum(models.CostLedger.meta_cost_ngn), 0),
-                func.coalesce(func.sum(models.CostLedger.ai_cost_ngn), 0),
-            ).where(
-                models.CostLedger.shop_id == shop_id,
-                models.CostLedger.day >= start_day,
-                models.CostLedger.day < end_day,
-            )
-        ).one()
-    )
+    meta, ai = session.execute(
+        select(
+            func.coalesce(func.sum(models.CostLedger.meta_cost_ngn), 0),
+            func.coalesce(func.sum(models.CostLedger.ai_cost_ngn), 0),
+        ).where(
+            models.CostLedger.shop_id == shop_id,
+            models.CostLedger.day >= start_day,
+            models.CostLedger.day < end_day,
+        )
+    ).one()
     return {"meta_ngn": float(meta), "ai_ngn": float(ai), "total_ngn": float(meta) + float(ai)}
 
 

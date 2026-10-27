@@ -94,7 +94,8 @@ def check_stuck_approvals(session=None) -> dict:
                 for a, age in amber
             ]
             if ops_mail.send_mail(
-                f"{len(amber)} approvals waiting >2h", "Stuck approvals (amber):\n" + "\n".join(lines)
+                f"{len(amber)} approvals waiting >2h",
+                "Stuck approvals (amber):\n" + "\n".join(lines),
             ):
                 sent["amber"] = len(amber)
         if red:
@@ -153,9 +154,7 @@ def check_margins(session=None, month: str | None = None) -> list[str]:
 
 def start() -> None:
     scheduler.add_job(_reminders_job, "cron", hour=9, minute=0)
-    scheduler.add_job(
-        _summary_job, "cron", hour=settings.daily_summary_hour, minute=5
-    )
+    scheduler.add_job(_summary_job, "cron", hour=settings.daily_summary_hour, minute=5)
     scheduler.add_job(_purge_job, "cron", day=1, hour=3, minute=0)
     scheduler.add_job(check_stuck_approvals, "interval", hours=1)
     scheduler.add_job(check_margins, "interval", days=1)

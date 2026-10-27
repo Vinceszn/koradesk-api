@@ -1,6 +1,17 @@
 """Commerce milestone one. Tenant consistency is enforced by composite FKs."""
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint
+
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.db import Base
 
 
@@ -42,7 +53,10 @@ class Merchant(Base):
 
 class Membership(Base):
     __tablename__ = "commerce_memberships"
-    __table_args__ = (UniqueConstraint("merchant_id", "user_id"), CheckConstraint("role IN ('owner', 'staff')"))
+    __table_args__ = (
+        UniqueConstraint("merchant_id", "user_id"),
+        CheckConstraint("role IN ('owner', 'staff')"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
     user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"))
@@ -59,7 +73,10 @@ class Location(Base):
 
 class Product(Base):
     __tablename__ = "commerce_products"
-    __table_args__ = (UniqueConstraint("id", "merchant_id"), UniqueConstraint("merchant_id", "name"))
+    __table_args__ = (
+        UniqueConstraint("id", "merchant_id"),
+        UniqueConstraint("merchant_id", "name"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
     name: Mapped[str] = mapped_column(String(160))
@@ -68,8 +85,11 @@ class Product(Base):
 class Variant(Base):
     __tablename__ = "commerce_variants"
     __table_args__ = (
-        UniqueConstraint("id", "merchant_id"), UniqueConstraint("merchant_id", "sku"),
-        ForeignKeyConstraint(["product_id", "merchant_id"], ["commerce_products.id", "commerce_products.merchant_id"]),
+        UniqueConstraint("id", "merchant_id"),
+        UniqueConstraint("merchant_id", "sku"),
+        ForeignKeyConstraint(
+            ["product_id", "merchant_id"], ["commerce_products.id", "commerce_products.merchant_id"]
+        ),
         CheckConstraint("price_kobo >= 0"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -107,8 +127,13 @@ class Balance(Base):
     __tablename__ = "commerce_balances"
     __table_args__ = (
         UniqueConstraint("merchant_id", "location_id", "variant_id"),
-        ForeignKeyConstraint(["location_id", "merchant_id"], ["commerce_locations.id", "commerce_locations.merchant_id"]),
-        ForeignKeyConstraint(["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]),
+        ForeignKeyConstraint(
+            ["location_id", "merchant_id"],
+            ["commerce_locations.id", "commerce_locations.merchant_id"],
+        ),
+        ForeignKeyConstraint(
+            ["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]
+        ),
         CheckConstraint("on_hand >= 0 AND reserved >= 0 AND reserved <= on_hand"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -126,8 +151,13 @@ class Movement(Base):
     __tablename__ = "commerce_movements"
     __table_args__ = (
         UniqueConstraint("merchant_id", "idempotency_key"),
-        ForeignKeyConstraint(["location_id", "merchant_id"], ["commerce_locations.id", "commerce_locations.merchant_id"]),
-        ForeignKeyConstraint(["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]),
+        ForeignKeyConstraint(
+            ["location_id", "merchant_id"],
+            ["commerce_locations.id", "commerce_locations.merchant_id"],
+        ),
+        ForeignKeyConstraint(
+            ["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]
+        ),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
@@ -165,9 +195,13 @@ class Supplier(Base):
 
 class StockOperation(Base):
     """Immutable metadata for a stock movement; corrections append a new row."""
+
     __tablename__ = "commerce_stock_operations"
     __table_args__ = (
-        ForeignKeyConstraint(["supplier_id", "merchant_id"], ["commerce_suppliers.id", "commerce_suppliers.merchant_id"]),
+        ForeignKeyConstraint(
+            ["supplier_id", "merchant_id"],
+            ["commerce_suppliers.id", "commerce_suppliers.merchant_id"],
+        ),
         CheckConstraint("unit_cost_kobo IS NULL OR unit_cost_kobo >= 0"),
     )
     movement_id: Mapped[int] = mapped_column(ForeignKey("commerce_movements.id"), primary_key=True)
@@ -178,4 +212,6 @@ class StockOperation(Base):
     supplier_name: Mapped[str] = mapped_column(String(120), default="")
     unit_cost_kobo: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reference: Mapped[str] = mapped_column(String(120), default="")
-    reverses_id: Mapped[int | None] = mapped_column(ForeignKey("commerce_movements.id"), unique=True, nullable=True)
+    reverses_id: Mapped[int | None] = mapped_column(
+        ForeignKey("commerce_movements.id"), unique=True, nullable=True
+    )

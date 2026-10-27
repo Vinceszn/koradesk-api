@@ -51,7 +51,10 @@ async def send_approval(to: str, header: str, body: str, approve_id: str, reject
                     "body": {"text": body[:1024]},
                     "action": {
                         "buttons": [
-                            {"type": "reply", "reply": {"id": approve_id[:256], "title": "Approve"}},
+                            {
+                                "type": "reply",
+                                "reply": {"id": approve_id[:256], "title": "Approve"},
+                            },
                             {"type": "reply", "reply": {"id": reject_id[:256], "title": "Reject"}},
                         ]
                     },

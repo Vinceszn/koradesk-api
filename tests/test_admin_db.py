@@ -33,8 +33,7 @@ def session():
 
 
 def _shop(session, **kw):
-    args = {"name": "S", "whatsapp_number": "234800000001", "plan": "starter",
-            "monthly_cap": 300}
+    args = {"name": "S", "whatsapp_number": "234800000001", "plan": "starter", "monthly_cap": 300}
     args.update(kw)
     shop = models.Shop(**args)
     session.add(shop)
@@ -57,8 +56,9 @@ def test_effective_cap_adds_packs(session):
 
     shop = _shop(session)
     assert caps.effective_cap(session, shop) == 300
-    session.add(m.OveragePack(shop_id=shop.id, conversations=100, amount_ngn=5000,
-                              month=caps.month_key()))
+    session.add(
+        m.OveragePack(shop_id=shop.id, conversations=100, amount_ngn=5000, month=caps.month_key())
+    )
     session.commit()
     assert caps.effective_cap(session, shop) == 400
 
@@ -69,8 +69,11 @@ def test_decide_approves_order_and_actor(session):
     session.add(order)
     session.commit()
     approval = models.Approval(
-        shop_id=shop.id, kind="order_draft",
-        payload_json=json.dumps({"order_id": order.id}), status="pending")
+        shop_id=shop.id,
+        kind="order_draft",
+        payload_json=json.dumps({"order_id": order.id}),
+        status="pending",
+    )
     session.add(approval)
     session.commit()
     approvals.decide_approval(session, approval, "approved", "admin:hello@koradesk.com")
@@ -86,8 +89,9 @@ def test_decide_approves_order_and_actor(session):
 def test_sla_escalates_once_per_level(session):
     shop = _shop(session)
     old = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=30)
-    approval = models.Approval(shop_id=shop.id, kind="order_draft",
-                               payload_json="{}", status="pending", created_at=old)
+    approval = models.Approval(
+        shop_id=shop.id, kind="order_draft", payload_json="{}", status="pending", created_at=old
+    )
     session.add(approval)
     session.commit()
     assert check_stuck_approvals(session) == {"amber": 0, "red": 1}
@@ -98,8 +102,15 @@ def test_sla_escalates_once_per_level(session):
 
 def test_margin_alert_fires_once_per_month(session):
     shop = _shop(session)
-    session.add(models.CostLedger(shop_id=shop.id, day=caps.month_key() + "-05",
-                                  meta_cost_ngn=12000, ai_cost_ngn=1000, messages=10))
+    session.add(
+        models.CostLedger(
+            shop_id=shop.id,
+            day=caps.month_key() + "-05",
+            meta_cost_ngn=12000,
+            ai_cost_ngn=1000,
+            messages=10,
+        )
+    )
     session.commit()
     month = caps.month_key()
     assert check_margins(session, month) == ["S"]

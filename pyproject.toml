@@ -1,0 +1,18 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "--strict-markers --strict-config"
+markers = ["postgres: requires a live PostgreSQL database via TEST_DATABASE_URL"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["work"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Routers depend on helpers defined earlier in commerce; preview sets env before imports.
+"app/commerce.py" = ["E402"]
+"scripts/preview.py" = ["E402"]
