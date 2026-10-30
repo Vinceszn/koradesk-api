@@ -57,23 +57,8 @@ def _shop_for(session: Session, business_number: str) -> models.Shop | None:
 async def _handle_button(
     session: Session, shop: models.Shop, sender: str, button_id: str
 ) -> None:
-    try:
-        action, _kind, approval_id = button_id.split(":")
-    except ValueError:
-        return
-    approval = session.get(models.Approval, int(approval_id or 0))
-    if approval is None:
-        return
-    before = approval.status
-    approvals.decide_approval(
-        session, approval, "approved" if action == "approve" else "rejected", actor=sender
-    )
-    if before == "pending" and approval.status != "pending":
-        await whatsapp.send_text(
-            sender,
-            "Approved. Logged and queued." if approval.status == "approved" else "Rejected. Nothing moved — tell me what to change.",
-        )
-        costs.log_meta_message(session, shop.id)
+    # Disabled until tenant-bound sender authorization and replay protection exist.
+    return
 
 
 def _capped(session: Session, shop: models.Shop, sender: str) -> bool:
@@ -94,8 +79,14 @@ async def _send_capped_notice(sender: str, shop: models.Shop) -> None:
 async def receive(request: Request, session: Session = Depends(get_session)) -> dict:
     raw = await request.body()
     if not verify_signature(settings.app_secret, raw, request.headers.get("X-Hub-Signature-256")):
-        return {"ok": False, "error": "bad signature"}
+        return Response(status_code=403, content="Invalid webhook signature")
     payload = json.loads(raw or b"{}")
+
+    # The legacy order extractor and delivery pipeline are not production-ready.
+    # Do not acknowledge or record messages as processed while they are paused.
+    if any(change.get("value", {}).get("messages") for entry in payload.get("entry", [])
+           for change in entry.get("changes", [])):
+        return Response(status_code=503, content="Legacy message processing is temporarily disabled")
 
     for entry in payload.get("entry", []):
         for change in entry.get("changes", []):

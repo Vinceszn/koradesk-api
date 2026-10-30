@@ -55,6 +55,70 @@ def test_order_pages_roles_and_tenant_boundaries(env):
     assert staff.post("/app/1/orders/draft", data={"csrf": "csrf3"}).status_code == 403
 
 
+def test_draft_retry_keeps_original_order_and_rejects_changed_input(env):
+    c = client()
+    stocked(c)
+    variant_id = open_stock(c, env, "SHIRT-M", 5)
+    first = draft(c, [variant_id], [1], customer_name="Ada")
+    retry = draft(c, [variant_id], [1], customer_name="Ada")
+    assert first.status_code == retry.status_code == 303
+    assert retry.headers["location"].split("?")[0] == first.headers["location"].split("?")[0]
+    assert draft(c, [variant_id], [1], customer_name="Someone else").status_code == 409
+    with env() as db:
+        assert db.scalar(select(func.count()).select_from(m.CommerceOrder)) == 1
+
+
+def test_quantity_boundary():
+    from fastapi import HTTPException
+    from app.commerce_orders import _positive
+    assert _positive("1000000") == 1000000
+    with pytest.raises(HTTPException):
+        _positive("1000001")
+
+
+def test_background_expiry_drains_multiple_batches(env, monkeypatch):
+    from app import commerce_expiry
+    counts = iter([100, 100, 3])
+    calls = []
+    def run_batch(db):
+        calls.append(db)
+        return next(counts)
+    monkeypatch.setattr(commerce_expiry, "SessionLocal", env)
+    monkeypatch.setattr(commerce_expiry, "expire_due", run_batch)
+    commerce_expiry.release_expired()
+    assert len(calls) == 3
+
+
+def test_merchant_lifespan_starts_and_stops_expiry(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app import commerce, commerce_expiry
+    events = []
+    monkeypatch.setattr(commerce_expiry, "start", lambda: events.append("start"))
+    monkeypatch.setattr(commerce_expiry, "stop", lambda: events.append("stop"))
+    with TestClient(commerce.app) as browser:
+        assert browser.get("/health").status_code == 200
+        assert events == ["start"]
+    assert events == ["start", "stop"]
+
+
+def test_background_expiry_releases_stock_without_page_visit(env, monkeypatch):
+    from app import commerce_expiry
+    c = client()
+    stocked(c)
+    variant_id = open_stock(c, env, "SHIRT-M", 2)
+    assert draft(c, [variant_id], [2]).status_code == 303
+    created_id = order_id(env)
+    assert c.post(f"/app/1/orders/{created_id}/place", data={"csrf": "csrf1", "key": "e" * 48, "version": "1"}, follow_redirects=False).status_code == 303
+    with env() as db:
+        db.get(m.CommerceOrder, created_id).reserved_until = 10
+        db.commit()
+    monkeypatch.setattr(commerce_expiry, "SessionLocal", env)
+    commerce_expiry.release_expired()
+    with env() as db:
+        assert db.get(m.CommerceOrder, created_id).order_status == "expired"
+        assert db.scalar(select(m.Balance.reserved)) == 0
+
+
 def test_draft_captures_customer_item_and_price_snapshots(env):
     c = client()
     stocked(c)

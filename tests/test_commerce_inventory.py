@@ -49,6 +49,20 @@ def test_receive_replay_and_supplier_snapshot(env):
     assert_stock(env, 15, 2)
 
 
+@pytest.mark.parametrize('supplier,cost', [('', ''), ('1', ''), ('', '0'), ('', '123.45')])
+def test_receive_with_optional_purchase_details(env, supplier, cost):
+    c = client()
+    setup(c)
+    data = payload(supplier_id=supplier, unit_cost=cost)
+    assert change(c, data).status_code == 303
+    assert change(c, data).status_code == 303
+    assert_stock(env, 15, 2)
+    with env() as db:
+        operation = db.scalar(select(m.StockOperation))
+        assert operation.supplier_id == (1 if supplier else None)
+        assert operation.unit_cost_kobo == (None if cost == '' else int(float(cost) * 100))
+
+
 def test_adjust_recount_stale_and_reverse(env):
     c = client()
     setup(c)

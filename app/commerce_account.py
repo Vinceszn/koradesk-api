@@ -362,6 +362,9 @@ async def confirm_email(request: Request, raw: str, db: Session = Depends(get_se
     if user.closed or user.email != change.previous_email:
         raise HTTPException(409, "This request is no longer valid.")
     reauthenticate(db, request, user, data)
+    db.refresh(user)
+    if user.closed or user.email != change.previous_email:
+        raise HTTPException(409, "This request is no longer valid.")
     consumed = db.execute(update(m.EmailChange).where(m.EmailChange.token_hash == change.token_hash, m.EmailChange.used.is_(False), m.EmailChange.expires > int(time.time())).values(used=True))
     if consumed.rowcount != 1:
         raise HTTPException(409, "This request was already completed.")

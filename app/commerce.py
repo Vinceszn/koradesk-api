@@ -4,6 +4,7 @@ import hmac
 import re
 import secrets
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -21,7 +22,18 @@ from app.db import get_session
 from app import commerce_models as m
 
 ROOT = Path(__file__).parent
-app = FastAPI(title="Kora merchant workspace")
+
+@asynccontextmanager
+async def lifespan(app):
+    from app.commerce_expiry import start, stop
+    start()
+    try:
+        yield
+    finally:
+        stop()
+
+
+app = FastAPI(title="Kora merchant workspace", lifespan=lifespan)
 app.mount("/assets", StaticFiles(directory=ROOT / "static"), name="assets")
 templates = Jinja2Templates(directory=ROOT / "templates" / "commerce")
 templates.env.filters["money"] = lambda value: f"₦{value / 100:,.2f}"
@@ -222,9 +234,15 @@ def home(request: Request, db: Session = Depends(get_session)):
 @app.get("/register")
 def auth_page(request: Request):
     csrf = secrets.token_hex(32)
-    response = templates.TemplateResponse(request, "auth.html", {"register": request.url.path == "/register", "csrf": csrf})
+    response = templates.TemplateResponse(request, "auth.html", {"register": request.url.path == "/register", "csrf": csrf,
+        "return_to": invitation_return(request.query_params.get("next", ""))})
     response.set_cookie("kora_form", csrf, httponly=True, secure=settings.env != "dev", samesite="strict", max_age=1800)
     return response
+
+
+def invitation_return(value):
+    # Only invitation paths may survive authentication; reject external redirects.
+    return value if re.fullmatch(r"/invite/[A-Za-z0-9_-]{20,100}", value) else ""
 
 
 @app.post("/register")
@@ -260,7 +278,7 @@ async def authenticate(request: Request, db: Session = Depends(get_session)):
     old_login = db.get(m.LoginSession, digest(old_token)) if old_token else None
     if old_login:
         db.delete(old_login)
-    return start_session(db, user, "/", request)
+    return start_session(db, user, invitation_return(str(data.get("next", ""))) or "/", request)
 
 
 @app.post("/logout")
@@ -468,7 +486,7 @@ def invitation_page(request: Request, token: str, db: Session = Depends(get_sess
         user, login = identity(request, db)
     except HTTPException:
         user, login = None, None
-    return templates.TemplateResponse(request, "invitation.html", {"invitation": invitation, "business": db.get(m.Merchant, invitation.merchant_id), "user": user, "csrf": login.csrf if login else ""})
+    return templates.TemplateResponse(request, "invitation.html", {"invitation": invitation, "business": db.get(m.Merchant, invitation.merchant_id), "user": user, "csrf": login.csrf if login else "", "return_to": "/invite/" + token})
 
 
 @app.post("/invite/{token}")

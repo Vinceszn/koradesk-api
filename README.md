@@ -89,13 +89,13 @@ Receiving currently handles one variant at a time; multi-item receiving is pendi
 
 Owners can save and edit draft orders, then place the complete order to reserve stock for 30 minutes. Placement rechecks every price and available quantity in one transaction. Staff may review orders but cannot change them in Sprint 4. Payment collection and fulfilment arrive in later sprints.
 
-Run the retry-safe expiry task on a regular schedule so overdue unpaid reservations release promptly:
+The merchant application runs a retry-safe expiry task every minute while it is running. To run an additional one-off sweep against the database configured in `DATABASE_URL`:
 
 ```bash
 python scripts/expire_orders.py
 ```
 
-The merchant pages also expire due reservations when an order list or detail page is opened. The scheduled task remains required in production so expiry does not depend on page traffic.
+The merchant pages also expire due reservations when an order list or detail page is opened. Production deployment must keep the merchant service running and monitor expiry failures; a separate scheduled sweep is recommended as an operational backup.
 
 ## Two separate applications
 
@@ -145,7 +145,7 @@ The suite uses isolated local test databases and does not need live WhatsApp or 
 
 ## Run the legacy WhatsApp/admin service
 
-The existing Dockerfile and Compose configuration launch **`app.main:app`**, not the merchant workspace. The Docker image does not currently package the merchant migration and preview tooling.
+The existing Dockerfile and Compose configuration launch **`app.main:app`**, not the merchant workspace. The Docker image does not currently package the merchant migration and preview tooling. Legacy WhatsApp message processing and approval decisions are paused while the unfinished pipeline is made safe. Signed incoming messages receive a temporary failure response so the provider can retry; retries are subject to the provider's retention policy and do not guarantee eventual delivery.
 
 Copy `.env.example` to `.env` and configure the required values, including WhatsApp credentials if testing that integration:
 

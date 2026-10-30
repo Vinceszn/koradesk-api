@@ -128,12 +128,14 @@ async def consume_token(request: Request,purpose: str,raw: str,db: Session=Depen
     data=await c.form_data(request,request.cookies.get("kora_form",""))
     token=valid_token(db,purpose,raw)
     new_hash=c.hash_password(password(data.get("password",""))) if purpose=="reset" else None
-    user=db.scalar(select(m.User).where(m.User.id==token.user_id).with_for_update())
+    if purpose == "reset":
+        from app.commerce_account import rate_limit
+        rate_limit(db, request, token.user_id, "recovery")
+    user=db.scalar(select(m.User).where(m.User.id==token.user_id).with_for_update().execution_options(populate_existing=True))
     if user.closed:
         raise HTTPException(400,"This account link is no longer valid.")
     if purpose == "reset":
-        from app.commerce_account import factor, profile, rate_limit, event
-        rate_limit(db, request, user.id, "recovery")
+        from app.commerce_account import factor, profile, event
         factor(db, profile(db, user), data.get("code", ""))
         event(db,user,request,"Password reset")
     consumed=db.execute(update(m.AccountToken).where(m.AccountToken.token_hash==token.token_hash,m.AccountToken.used.is_(False),m.AccountToken.expires>int(time.time())).values(used=True))
@@ -152,8 +154,6 @@ async def consume_token(request: Request,purpose: str,raw: str,db: Session=Depen
 async def change_password(request: Request, db: Session=Depends(get_session)):
     user,login=c.identity(request,db)
     data=await c.form_data(request,login.csrf)
-    # Refresh under lock so simultaneous changes cannot authenticate with a stale hash.
-    user=db.scalar(select(m.User).where(m.User.id==user.id).with_for_update().execution_options(populate_existing=True))
     from app.commerce_account import reauthenticate, event
     reauthenticate(db,request,user,data)
     if "password_confirmation" in data and data["password_confirmation"] != data.get("password"):

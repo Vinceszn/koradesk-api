@@ -318,17 +318,7 @@ def approvals_inbox(request: Request, status: str = "pending"):
 
 @router.post("/approvals/{approval_id}/decide")
 def decide(approval_id: int, decision: str = Form(...)):
-    if decision not in ("approved", "rejected"):
-        return HTMLResponse("bad decision", status_code=400)
-    session = _session()
-    try:
-        approval = session.get(models.Approval, approval_id)
-        if approval is None:
-            return HTMLResponse("approval not found", status_code=404)
-        approvals.decide_approval(session, approval, decision, operator_actor())
-    finally:
-        session.close()
-    return RedirectResponse("/admin/approvals?status=pending", status_code=303)
+    return HTMLResponse("Legacy approval decisions are temporarily disabled.", status_code=503)
 
 
 @router.get("/shops/{shop_id}/{tab}", response_class=HTMLResponse)

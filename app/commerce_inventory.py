@@ -138,11 +138,13 @@ async def change_stock(request: Request, merchant_id: int, variant_id: int, db: 
     if kind == "receive":
         if variant.archived:
             raise HTTPException(409, "Restore this variant before receiving stock.")
-        supplier_id = number(data.get("supplier_id"), "Supplier", 1, 2147483647)
-        supplier = db.scalar(select(m.Supplier).where(m.Supplier.id == supplier_id, m.Supplier.merchant_id == merchant_id, m.Supplier.archived.is_(False)).with_for_update())
-        if not supplier:
-            raise HTTPException(404, "Active supplier not found.")
-        cost = c.price_value(data.get("unit_cost", ""))
+        if str(data.get("supplier_id", "")).strip():
+            supplier_id = number(data.get("supplier_id"), "Supplier", 1, 2147483647)
+            supplier = db.scalar(select(m.Supplier).where(m.Supplier.id == supplier_id, m.Supplier.merchant_id == merchant_id, m.Supplier.archived.is_(False)).with_for_update())
+            if not supplier:
+                raise HTTPException(404, "Active supplier not found.")
+        if str(data.get("unit_cost", "")).strip():
+            cost = c.price_value(data.get("unit_cost"))
         delta = number(data.get("quantity"), "Received quantity", 1)
     elif kind == "adjust":
         delta = number(data.get("quantity"), "Adjustment", -1000000)

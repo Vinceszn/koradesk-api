@@ -25,7 +25,7 @@ FULFILMENT_STATES = ("unfulfilled", "partially_fulfilled", "fulfilled", "cancell
 
 
 def _positive(value, label="Quantity"):
-    if not re.fullmatch(r"[1-9]\d{0,5}", str(value or "")):
+    if not re.fullmatch(r"[1-9]\d{0,6}", str(value or "")) or int(value) > 1_000_000:
         raise HTTPException(400, f"{label} must be a whole number between 1 and 1,000,000.")
     return int(value)
 
@@ -280,6 +280,18 @@ async def save_draft(request: Request, merchant_id: int, order_id: int = 0, db: 
     user, login, _, _ = c.workspace(request, db, merchant_id, owner=True)
     data = await c.form_data(request, login.csrf)
     try:
+        submitted = _submitted(data)
+        fingerprint = c.digest(json.dumps({k: submitted[k] for k in ("customer_id", "customer_name", "customer_email", "customer_phone", "rows")}, sort_keys=True))
+        if not order_id:
+            key = str(data.get("key", ""))
+            if not re.fullmatch(r"[a-f0-9]{48}", key):
+                raise HTTPException(400, "Reload the order before trying again.")
+            existing = db.scalar(select(m.OrderRequest).where(m.OrderRequest.merchant_id == merchant_id,
+                m.OrderRequest.request_key == "draft:" + key))
+            if existing:
+                if existing.request_hash != fingerprint:
+                    raise HTTPException(409, "This submission was already used for a different order change.")
+                return c.redirect(f"/app/{merchant_id}/orders/{existing.order_id}?notice=Draft+was+already+saved.")
         customer_id, customer_name, customer_email, customer_phone = _customer_snapshot(db, merchant_id, data)
         lines, total = _draft_lines(db, merchant_id, data)
         now = int(time.time())
@@ -298,7 +310,6 @@ async def save_draft(request: Request, merchant_id: int, order_id: int = 0, db: 
                 created_by=user.id, created_at=now, updated_at=now)
             db.add(order)
             db.flush()
-            fingerprint = c.digest(json.dumps(dict(customer_id=customer_id, lines=lines), sort_keys=True))
             replay = _request(db, order, data, "draft", fingerprint)
             if replay:
                 db.rollback()
