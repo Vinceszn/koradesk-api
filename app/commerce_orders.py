@@ -342,7 +342,7 @@ def order_detail(request: Request, merchant_id: int, order_id: int, db: Session 
     events = db.execute(select(m.OrderEvent, m.User).outerjoin(m.User, m.User.id == m.OrderEvent.actor_id).where(
         m.OrderEvent.order_id == order.id, m.OrderEvent.merchant_id == merchant_id).order_by(m.OrderEvent.id.desc())).all()
     ctx.update(mode="order-detail", order=order, items=items, reservations=reservations, order_events=events,
-               place_key=secrets.token_hex(24), cancel_key=secrets.token_hex(24))
+               place_key=secrets.token_hex(24), cancel_key=secrets.token_hex(24), fulfil_key=secrets.token_hex(24))
     return c.templates.TemplateResponse(request, "orders.html", ctx)
 
 
@@ -400,7 +400,7 @@ async def cancel_order(request: Request, merchant_id: int, order_id: int, db: Se
         return c.redirect(f"/app/{merchant_id}/orders/{order.id}?notice=Order+was+already+cancelled.")
     if str(order.version) != str(data.get("version", "")):
         raise HTTPException(409, "This order changed in another tab. Reload it before cancelling.")
-    if order.order_status != "placed" or order.fulfilment_status != "unfulfilled":
+    if order.order_status != "placed" or order.fulfilment_status != "unfulfilled" or order.payment_status != "unpaid":
         raise HTTPException(409, "Only a placed, unfulfilled order can be cancelled.")
     reservations = db.scalars(select(m.StockReservation).where(m.StockReservation.order_id == order.id,
         m.StockReservation.merchant_id == merchant_id, m.StockReservation.state == "active").order_by(

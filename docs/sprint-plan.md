@@ -9,7 +9,7 @@ Sprint sizes are planning estimates, not calendar commitments. The expanded acco
 | 2: Inventory operations | Suppliers, receiving, purchase costs, reasoned adjustments, recounts, compensating corrections, reconciliation, low-stock thresholds | Auditable stock changes reconcile with balances | Implemented and locally verified; production PostgreSQL checks pending |
 | 3: Personal account and customization | Profile/photo, secure email changes, sessions, security history, two-factor/recovery, business access/invitations/ownership transfer, personal export/closure, appearance/navigation/region/notification preferences, overview cards and account-language support | Account changes are authorized, preferences persist across sessions, recovery cannot bypass two-factor, business audit records survive closure, and responsive browser checks pass | Implemented and locally verified; live email and production checks pending |
 | 4: Orders and reservations | Orders/items, price snapshots, customers, atomic reservations, cancellation, unpaid expiry, independent order/payment/fulfilment states | Last-unit contention, whole-order rollback and idempotent retry tests pass | Implemented and locally verified; production PostgreSQL contention checks pending |
-| 5: Walk-in sales and fulfilment | Cashier permissions, barcode/typed-search POS, fast sales, audited cash declaration, pickup/dispatch, partial fulfilment/cancellation, order search/details | Scanned or typed sale completes and deducts stock once; retries and partial actions retain correct balances | POS handoff specified; implementation planned |
+| 5: Walk-in sales and fulfilment | Cashier permissions, barcode/typed-search POS, fast sales, audited cash declaration, pickup/dispatch, partial fulfilment/cancellation, order search/details | Scanned or typed sale completes and deducts stock once; retries and partial actions retain correct balances | Implemented locally; production contention and physical scanner checks pending |
 | 6: Provider payments | Paystack sandbox, account binding, attempts, webhook verification/deduplication, reconciliation, late/partial/mismatch exception review | Duplicate and racing payment events are safe; exceptions visible | Planned |
 | 7: Receipts, returns and refunds | Branded immutable PDF receipts, download/manual WhatsApp sharing, durable jobs/retries, resellable/damaged returns, refund tracking/provider refunds | Receipt failures retry; refunds and physical restock are separate | Planned |
 | 8: Reporting and operations | Sales charts/date filters, best sellers, stock trends, exports, merchant directory/onboarding status, suspension, support queue, admin audit, manual pilot subscription tracking | Reports reconcile; operators resolve issues with an audit trail | Planned |
@@ -19,6 +19,8 @@ Sprint sizes are planning estimates, not calendar commitments. The expanded acco
 
 ## Continuous requirements
 Maintain the approved dark UI; mobile/desktop/keyboard verification; tenant isolation and role checks; transactional data changes and duplicate protection; meaningful failure/retry tests; preview before merge; documentation and operating instructions.
+
+The approved [Precision UI overhaul](precision-ui.md) is implemented locally across the merchant app, account and onboarding. It includes the reviewed catalogue-import flow and scoped stock history. Reporting charts and provider-payment interfaces remain tied to their planned feature sprints; the redesign does not present those integrations as available.
 
 ## Detailed specifications
 
@@ -33,3 +35,5 @@ Accounts, owner/read-only staff, businesses, one location, catalogue/CSV import,
 
 ## Account sprint insertion
 The user expanded the next sprint to include all proposed personal-account and customization features. This is Sprint 3; orders/reservations move to Sprint 4, and later sprints shift by one. Keep account preferences separate from business-wide branding, currency, team permissions, and stock rules.
+
+Sprint 5 implementation and validation: [cash POS and fulfilment](sprint-5-pos.md).

@@ -19,7 +19,7 @@ if (toggle) {
   });
   mobile.addEventListener('change', () => applySidebar(mobile.matches || saved));
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && mobile.matches) { applySidebar(true); toggle.focus(); }
+    if (event.key === 'Escape' && mobile.matches && !document.querySelector('dialog[open]')) { applySidebar(true); toggle.focus(); }
   });
 }
 const switches = document.querySelector('.chart-switch');
@@ -28,6 +28,6 @@ if (switches) {
   switches.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
     switches.querySelectorAll('button').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
     document.querySelectorAll('[data-chart]').forEach(chart => { chart.hidden = chart.dataset.chart !== button.dataset.measure; });
-    document.querySelector('.holdings .analytics-heading p').textContent = button.dataset.measure === 'units' ? 'Current quantities by variant' : 'On-hand stock at selling price';
+    document.querySelector('.holdings .analytics-heading h2+p').textContent = button.dataset.measure === 'units' ? 'Available quantities by variant' : 'Available stock at selling price';
   }));
 }

@@ -203,6 +203,13 @@ async def http_error(request, exc):
 
 @app.exception_handler(IntegrityError)
 async def conflict(request, exc):
+    db = getattr(request.state, "account_db", None)
+    if db is not None:
+        db.rollback()
+    # The failed request's dependency may already have closed its session.
+    # The standalone conflict page must not load expired, detached account data.
+    request.state.account_user = None
+    request.state.account_db = None
     return templates.TemplateResponse(request, "error.html", {"message": "That record already exists or was changed in another tab. Return to your workspace and check it before trying again."}, status_code=409)
 
 
@@ -329,8 +336,11 @@ def dashboard(request: Request, merchant_id: int, tab: str = "overview", db: Ses
     if tab == "import":
         workspace(request, db, merchant_id, owner=True)
         return redirect(f"/app/{merchant_id}/products#catalogue-import")
-    if tab not in ("overview", "orders", "products", "inventory", "team", "settings", "customers", "suppliers"):
+    if tab not in ("overview", "orders", "products", "inventory", "team", "settings", "customers", "suppliers", "pos"):
         raise HTTPException(404, "Page not found.")
+    if tab == "pos":
+        from app.commerce_pos import page
+        return page(request, db, merchant_id)
     if tab == "orders":
         from app.commerce_orders import orders_page
         return orders_page(request, db, merchant_id)
@@ -356,6 +366,12 @@ def dashboard(request: Request, merchant_id: int, tab: str = "overview", db: Ses
                 query = query.where(m.Customer.name.contains(search, autoescape=True) | m.Customer.email.contains(search, autoescape=True) | m.Customer.phone.contains(search, autoescape=True))
             ctx["customers"] = db.scalars(query.order_by(m.Customer.name)).all()
         return templates.TemplateResponse(request, "manage.html", ctx)
+    if tab == "overview":
+        active = [row for row in ctx["rows"] if not row[1].archived]
+        ctx["overview_rows"] = sorted([row for row in active if row[2].counted], key=lambda row: row[2].on_hand - row[2].reserved, reverse=True)[:8]
+        ctx["overview_low"] = sum(b.counted and b.on_hand - b.reserved <= b.low_stock_threshold for _, v, b in active)
+        ctx["overview_uncounted"] = sum(not b.counted for _, v, b in active)
+        ctx["open_orders"] = db.scalar(select(func.count()).select_from(m.CommerceOrder).where(m.CommerceOrder.merchant_id == merchant_id, m.CommerceOrder.order_status == "placed"))
     if tab == "products" and request.query_params.get("archived") != "1":
         ctx["rows"] = [row for row in ctx["rows"] if not row[1].archived]
     return templates.TemplateResponse(request, "workspace.html", ctx)
@@ -396,47 +412,8 @@ def sample():
 
 @app.post("/app/{merchant_id}/import")
 async def import_products(request: Request, merchant_id: int, db: Session = Depends(get_session)):
-    _, login, _, _ = workspace(request, db, merchant_id, owner=True)
-    data = await form_data(request, login.csrf)
-    upload = data.get("file")
-    if not hasattr(upload, "read"):
-        raise HTTPException(400, "Choose a CSV file.")
-    raw = await upload.read(1000001)
-    if len(raw) > 1000000:
-        raise HTTPException(400, "CSV must be smaller than 1 MB.")
-    try:
-        from app.commerce_csv import catalogue_rows
-        rows = catalogue_rows(raw)
-        added, skipped, seen = 0, 0, set()
-        for index, row in rows:
-            try:
-                sku = clean(row["sku"], "SKU", 64).upper()
-                name = clean(row["name"], "Product name", 160)
-                label = clean(row["variant"] or "Standard", "Variant")
-                price = price_value(row["price"])
-                if sku in seen:
-                    raise HTTPException(400, f"SKU {sku} appears more than once in this file.")
-                seen.add(sku)
-                existing = db.scalar(select(m.Variant).where(m.Variant.merchant_id == merchant_id, m.Variant.sku == sku))
-                if existing:
-                    product = db.get(m.Product, existing.product_id)
-                    if (product.name, existing.label, existing.price_kobo, existing.archived) != (name, label, price, row["archived"]):
-                        raise HTTPException(400, f"SKU {sku} already exists with different details. Edit that variant in Products or use a new SKU.")
-                    skipped += 1
-                    continue
-                variant = add_variant(db, merchant_id, row)
-                variant.archived = row["archived"]
-                added += 1
-            except HTTPException as exc:
-                raise HTTPException(400, f"CSV row {index}: {exc.detail} Nothing was imported.")
-        db.commit()
-    except (HTTPException, IntegrityError) as exc:
-        db.rollback()
-        ctx = context(request, db, merchant_id, "products")
-        ctx["rows"] = [row for row in ctx["rows"] if not row[1].archived]
-        ctx["import_error"] = exc.detail if isinstance(exc, HTTPException) else "A product changed while importing. Nothing was imported. Reload your catalogue and try again."
-        return templates.TemplateResponse(request, "workspace.html", ctx, status_code=400)
-    return redirect(f"/app/{merchant_id}/products?notice=Imported+{added}+variants.+Skipped+{skipped}+unchanged+variants.+Stock+quantities+were+not+changed.")
+    from app.commerce_imports import commit
+    return await commit(request, merchant_id, db)
 
 
 @app.post("/app/{merchant_id}/stock/{variant_id}")
@@ -539,3 +516,9 @@ from app.commerce_inventory import router as inventory_router
 app.include_router(inventory_router)
 from app.commerce_orders import router as orders_router
 app.include_router(orders_router)
+
+from app.commerce_pos import router as pos_router
+app.include_router(pos_router)
+
+from app.commerce_imports import router as import_router
+app.include_router(import_router)

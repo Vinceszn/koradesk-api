@@ -2,7 +2,7 @@
 
 Kora Desk is a merchant workspace for managing a business, product catalogue, customers, suppliers, inventory, and orders. This repository contains the merchant web application and a separate legacy WhatsApp/internal-admin service.
 
-**Current stage:** Sprints 1–4 are implemented and locally verified. Walk-in sales, fulfilment, provider payments, receipts, and a production pilot are still planned.
+**Current stage:** Sprints 1–5 are implemented locally. Provider payments, branded receipts, and a production pilot remain planned.
 
 ## What is available
 
@@ -11,13 +11,16 @@ Kora Desk is a merchant workspace for managing a business, product catalogue, cu
 | Accounts | Profile/photo, secure email changes, password recovery, two-factor authentication, session controls, security history, personal data export and closure |
 | Preferences | Appearance, navigation, table density, regional dates, account/navigation language, notification choices and overview cards |
 | Businesses | Business setup, settings, and switching between businesses |
-| Team | Owner and read-only staff access, invitations and replacement invitations |
-| Catalogue | Products and variants, SKU/pricing edits, archive/restore, CSV import and export |
+| Team | Owner/staff access, optional cashier capability, invitations and replacement invitations |
+| Catalogue | Products and variants, SKU/pricing edits, archive/restore, reviewed CSV import and export |
+| Point of sale | Barcode/SKU lookup, basket, cash declarations and change, cashier permissions, retry protection and stock deductions |
 | Customers | Basic customer records |
 | Suppliers | Supplier records and supplier details captured on stock receipts |
 | Inventory | Opening counts, receiving, purchase costs, adjustments, recounts, reversals, reconciliation, low-stock indicators, and paginated movement history |
 | Orders | Drafts, customer and item snapshots, server totals, atomic stock reservations, independent statuses, cancellation, unpaid expiry, search and filters |
 | Overview | Stock summaries and charts, with collapsible navigation |
+
+The [Precision UI redesign](docs/precision-ui.md) applies the approved Kora brand across the merchant workspace, POS, personal account, authentication and onboarding. It adds focused creation panels, stock-result previews, searchable inventory, variant-specific history, compact order filters and a validate/review/confirm CSV flow. Current local verification: 128 Python tests, five account interaction tests and desktop/mobile browser checks across 17 routes.
 
 The [Sprints 1–2 feature audit](docs/feature-audit.md) records 83 passing tests and three browser walkthroughs. The [account sprint](docs/sprint-3-account.md) raised the suite to 94 tests. [Sprint 4](docs/sprint-4-orders.md) brings it to 101 passing tests and adds a responsive real-browser order walkthrough. These are local verification results, not evidence of production readiness. Live email delivery and production PostgreSQL contention checks remain outstanding.
 
@@ -58,7 +61,7 @@ Use `--port 8011` to choose another port. Stop the preview with Ctrl+C. Existing
 
 ## Product CSV import
 
-Open **Products** in the merchant workspace and use the CSV upload section to download the sample. The old `/import` address redirects there. The required headers are:
+Open **Products → Import CSV** to download the sample and choose a file. Review new, unchanged and invalid rows before confirming. Confirmation checks the file again against current records and imports the catalogue atomically. The old `/import` address redirects there. The required headers are:
 
 ```csv
 name,variant,sku,price
@@ -192,7 +195,7 @@ Legacy operational emails use `ADMIN_EMAILS` and `SMTP_HOST`, `SMTP_PORT`, `SMTP
 | 2 | Suppliers, receiving, stock corrections, reconciliation, low-stock indicators | Implemented; production PostgreSQL checks pending |
 | 3 | Personal account, security and customization | Implemented and locally verified; live email and production checks pending |
 | 4 | Orders and stock reservations | Implemented and locally verified; production PostgreSQL contention checks pending |
-| 5 | Walk-in sales and fulfilment | Planned |
+| 5 | Walk-in sales and fulfilment | Implemented locally; production and physical scanner checks pending |
 | 6 | Provider payments | Planned |
 | 7 | Receipts, returns, and refunds | Planned |
 | 8 | Reporting and operator tools | Planned |
@@ -201,3 +204,7 @@ Legacy operational emails use `ADMIN_EMAILS` and `SMTP_HOST`, `SMTP_PORT`, `SMTP
 | 11 | WhatsApp commerce integration | After pilot |
 
 See the [full sprint plan](docs/sprint-plan.md), [Sprint 1 notes](docs/sprint-1.md), [Sprint 2 notes](docs/sprint-2.md), [account sprint notes](docs/sprint-3-account.md), [Sprint 4 orders and barcode POS handoff](docs/sprint-4-orders.md), [feature audit](docs/feature-audit.md), and [sprint checkpoint](docs/sprint-checkpoint.md) for scope and evidence. Earlier milestone and design documents are historical snapshots; their feature counts and pending-work lists may describe an older stage.
+
+## Cash POS
+
+Open Point of sale to search by name/SKU or scan a keyboard-wedge barcode ending in Enter. Owners assign barcodes in the variant editor or POS and enable cashier access in Your team. Cash sales record a cash declaration and stock deduction atomically. Owners record pickup, dispatch or unpaid line cancellation from order details. See [Sprint 5 notes](docs/sprint-5-pos.md) for payment rules and release checks.

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Point of sale{% endblock %}
+{% block workspace %}
+<div id="pos" data-view="products">
+  <header class="pos-heading">
+    <div><p class="pos-kicker">SELL IN STORE</p><h1>Point of sale<span class="pos-online" id="pos-connection">Online</span></h1></div>
+    <div class="pos-heading-actions"><button type="button" class="pos-quiet" id="pos-shortcuts">Keyboard shortcuts <kbd>?</kbd></button><a class="button secondary" href="/app/{{ merchant.id }}/orders" aria-label="Sales history">{{ icon('receipt') }} Sales history</a></div>
+  </header>
+  {% if request.query_params.get('sold','').isdigit() %}
+  <div class="pos-success" role="status">{{ icon('check') }}<div><strong>Sale complete</strong><span>Payment recorded and stock updated. Ready for the next customer.</span></div><a href="/app/{{ merchant.id }}/orders/{{ request.query_params.get('sold') }}">View sale {{ icon('arrow') }}</a></div>
+  {% endif %}
+  <nav class="pos-mobile-tabs" aria-label="Register view"><button type="button" data-pos-view="products" aria-pressed="true">Products</button><button type="button" data-pos-view="basket" aria-pressed="false">Basket <span id="pos-mobile-count">0</span></button></nav>
+  <div class="pos-layout">
+    <section class="pos-products" aria-label="Product catalogue">
+      <div class="pos-search-wrap">{{ icon('search') }}<label class="sr-only" for="pos-search">Search products or scan a barcode</label><input id="pos-search" type="search" autocomplete="off" placeholder="Search products, SKU or scan barcode" autofocus><button type="button" id="pos-search-clear" aria-label="Clear search" hidden>×</button><kbd>F2</kbd></div>
+      <div class="pos-catalogue-toolbar"><div class="pos-filters" role="group" aria-label="Filter products"><button type="button" data-pos-filter="all" aria-pressed="true">All products</button><button type="button" data-pos-filter="available" aria-pressed="false">In stock</button><button type="button" data-pos-filter="favorites" aria-pressed="false">★ Favourites</button></div><button class="pos-view-toggle" type="button" id="pos-list-toggle" aria-pressed="false" aria-label="Show products as a list">{{ icon('overview') }}<span>List view</span></button></div>
+      <div class="pos-catalogue-meta"><span id="pos-result-count"></span><span>Scan a barcode, then Enter</span></div>
+      <div id="pos-results" class="pos-results"></div>
+      <div id="pos-no-results" class="pos-empty" hidden>{{ icon('search') }}<h2>No products found</h2><p id="pos-empty-message"></p><button type="button" class="pos-quiet" id="pos-reset-filters">Show all products</button></div>
+      <div class="pos-catalogue-footer"><span id="pos-status" role="status" aria-live="polite">Ready to scan. Select a product to add it.</span><a href="/app/{{ merchant.id }}/products">{{ 'Manage products & barcodes' if membership.role == 'owner' else 'View products' }} {{ icon('arrow') }}</a></div>
+      <div hidden id="pos-catalogue">{% for p,v,b in rows %}<span data-id="{{ v.id }}" data-name="{{ p.name }}" data-label="{{ v.label }}" data-sku="{{ v.sku }}" data-price="{{ v.price_kobo }}" data-available="{{ b.on_hand-b.reserved if b.counted else 0 }}" data-counted="{{ 'yes' if b.counted else 'no' }}" data-archived="{{ 'yes' if v.archived else 'no' }}"></span>{% endfor %}</div>
+      <div hidden id="pos-codes">{% for code in codes %}<span data-code="{{ code.code }}" data-id="{{ code.variant_id }}"></span>{% endfor %}</div>
+    </section>
+    <aside class="pos-basket" aria-labelledby="pos-basket-title">
+      <div class="pos-basket-heading"><div><h2 id="pos-basket-title">Current sale <span id="pos-line-count">0</span></h2><p>In-store · {{ location.name }}</p></div><button type="button" class="pos-quiet" id="pos-clear" disabled>Clear</button></div>
+      <div class="pos-customer"><label for="pos-customer">{{ icon('team') }} Customer</label><select id="pos-customer" name="customer_id" form="pos-checkout"><option value="">Walk-in customer</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}</select></div>
+      <div class="pos-cart-scroll"><div id="pos-basket-empty" class="pos-empty">{{ icon('receipt') }}<h3>Your next sale starts here</h3><p>Scan a barcode or choose a product.<br>Items will appear in this basket.</p></div><div id="pos-lines"></div></div>
+      <div class="pos-cart-footer"><div class="pos-review" id="pos-review" hidden><p>Some items have changed. Review stock and prices before charging.</p><button type="button" class="pos-quiet" id="pos-update-basket">Update basket to current values</button></div><p class="pos-subtotal"><span id="pos-unit-count">0 items</span><span id="pos-subtotal">₦0.00</span></p><p class="pos-total"><span>Total</span><strong id="pos-total">₦0.00</strong></p><button type="button" class="pos-charge" id="pos-pay" disabled><span>Charge</span><strong id="pos-charge-total">₦0.00</strong>{{ icon('arrow') }}</button><p class="pos-cash-note">Cash checkout <span>F4 to charge</span></p></div>
+    </aside>
+  </div>
+  <button type="button" class="pos-mobile-basket" id="pos-mobile-basket" hidden><span id="pos-mobile-summary">View basket</span><strong id="pos-mobile-total">₦0.00</strong>{{ icon('arrow') }}</button>
+  <noscript><p class="notice">Enable JavaScript to use the register. You can still manage orders from Sales history.</p></noscript>
+</div>
+<dialog id="pos-payment" class="pos-dialog" aria-labelledby="pos-payment-title">
+  <form method="post" action="/app/{{ merchant.id }}/pos/sale" id="pos-checkout">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ key }}"><input type="hidden" name="basket" id="pos-payload">
+    <div class="pos-dialog-heading"><div><p class="pos-kicker">CASH PAYMENT</p><h2 id="pos-payment-title">Take payment</h2></div><button type="button" class="pos-close" id="pos-payment-close" aria-label="Back to basket">×</button></div>
+    <div class="pos-payment-due"><span>Amount due</span><strong id="pos-payment-total">₦0.00</strong><small id="pos-payment-summary"></small></div>
+    <label class="pos-cash-label" for="pos-cash">Cash received (₦)</label><input id="pos-cash" name="tendered" type="number" inputmode="decimal" min="0" max="20000000" step=".01" required aria-describedby="pos-change">
+    <div id="pos-cash-presets" class="pos-cash-presets" role="group" aria-label="Suggested cash amounts"></div>
+    <div class="pos-change-row"><span id="pos-change-label">Change to give</span><strong id="pos-change">₦0.00</strong></div>
+    <p id="pos-payment-error" class="pos-payment-error" role="alert" hidden></p><a id="pos-reload" class="pos-quiet" href="/app/{{ merchant.id }}/pos" hidden>Reload products and review basket</a>
+    <p class="pos-payment-note">Complete the sale after receiving the cash. This records payment and deducts the items from stock.</p>
+    <button class="pos-charge" id="pos-complete" disabled>{{ icon('check') }}<span>Complete cash sale</span></button>
+  </form>
+</dialog>
+<dialog id="pos-clear-dialog" class="pos-dialog pos-small-dialog" aria-labelledby="pos-clear-title"><h2 id="pos-clear-title">Clear this sale?</h2><p>Remove all items and start a new basket.</p><div class="pos-dialog-actions"><button type="button" class="button secondary" id="pos-keep">Keep sale</button><button type="button" class="button" id="pos-discard">Clear basket</button></div></dialog>
+<dialog id="pos-help" class="pos-dialog pos-small-dialog" aria-labelledby="pos-help-title"><div class="pos-dialog-heading"><h2 id="pos-help-title">Keyboard shortcuts</h2><button type="button" class="pos-close" id="pos-help-close" aria-label="Close keyboard shortcuts">×</button></div><dl class="pos-shortcut-list"><div><dt>Search or scan</dt><dd><kbd>F2</kbd></dd></div><div><dt>Add exact barcode / SKU</dt><dd><kbd>Enter</kbd></dd></div><div><dt>Take payment</dt><dd><kbd>F4</kbd></dd></div><div><dt>Close payment / clear search</dt><dd><kbd>Esc</kbd></dd></div></dl><p>For scanners that type a code and Enter, keep the search field focused. Repeated scans add another unit.</p></dialog>
+{% endblock %}

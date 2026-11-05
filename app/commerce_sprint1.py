@@ -191,6 +191,7 @@ def edit_variant(request: Request,merchant_id: int,variant_id: int,db: Session=D
     ctx=c.context(request,db,merchant_id,"products")
     variant=variant_for(db,merchant_id,variant_id)
     ctx.update(mode="variant",variant=variant,product=db.get(m.Product,variant.product_id))
+    ctx["barcodes"]=db.scalars(select(m.VariantBarcode).where(m.VariantBarcode.merchant_id==merchant_id,m.VariantBarcode.variant_id==variant_id,m.VariantBarcode.archived.is_(False))).all()
     return c.templates.TemplateResponse(request,"manage.html",ctx)
 
 @router.post("/app/{merchant_id}/variants/{variant_id}/edit")

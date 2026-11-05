@@ -9,33 +9,37 @@
   <link rel="stylesheet" href="/assets/commerce.css">
   {% if merchant is defined %}<link rel="stylesheet" href="/assets/dashboard.css"><script src="/assets/dashboard.js" defer></script>{% endif %}
   {% if tab is defined and tab == 'orders' %}<link rel="stylesheet" href="/assets/orders.css"><script src="/assets/orders.js" defer></script>{% endif %}
+  {% if tab is defined and tab == "pos" %}<link rel="stylesheet" href="/assets/pos.css"><script src="/assets/pos.js" defer></script>{% endif %}
   <script src="/assets/commerce.js" defer></script>
   <link rel="stylesheet" href="/assets/account.css">
   <link rel="stylesheet" href="/assets/preferences.css">
+  <link rel="stylesheet" href="/assets/precision.css">
+  <script src="/assets/precision.js" defer></script>
   <script type="module" src="/assets/preferences.js"></script>
 </head>
-<body class="{{ 'workspace-ui' if merchant is defined else '' }} {{ 'account-ui' if account_tab is defined or (user is defined and merchant is not defined) else '' }} {{ 'sidebar-collapsed' if prefs is defined and prefs.sidebar == 'collapsed' else '' }}" data-theme="{{ prefs.theme if prefs is defined else 'dark' }}" data-density="{{ prefs.density if prefs is defined else 'comfortable' }}" data-motion="{{ 'reduced' if prefs is defined and prefs.reduced_motion else 'full' }}" data-patterns="{{ 'on' if prefs is defined and prefs.chart_patterns else 'off' }}" data-sidebar="{{ prefs.sidebar if prefs is defined else 'expanded' }}" data-csrf="{{ csrf | default('') }}" data-cards="{{ prefs.cards | join(',') if prefs is defined else 'value,units,variants,team' }}" data-error-path="{{ request.url.path if error is defined and error else '' }}" data-account-language="{{ prefs.language if prefs is defined else 'en' }}">
+<body data-section="{{ tab | default('account') }}" class="precision-ui {{ 'workspace-ui' if merchant is defined else '' }} {{ 'account-ui' if account_tab is defined or (user is defined and merchant is not defined) else '' }} {{ 'sidebar-collapsed' if prefs is defined and prefs.sidebar == 'collapsed' else '' }}" data-theme="{{ prefs.theme if prefs is defined else 'dark' }}" data-density="{{ prefs.density if prefs is defined else 'comfortable' }}" data-motion="{{ 'reduced' if prefs is defined and prefs.reduced_motion else 'full' }}" data-patterns="{{ 'on' if prefs is defined and prefs.chart_patterns else 'off' }}" data-sidebar="{{ prefs.sidebar if prefs is defined else 'expanded' }}" data-csrf="{{ csrf | default('') }}" data-cards="{{ prefs.cards | join(',') if prefs is defined else 'value,units,variants,team' }}" data-error-path="{{ request.url.path if error is defined and error else '' }}" data-account-language="{{ prefs.language if prefs is defined else 'en' }}">
 <a class="skip-link" href="#main-content">Skip to content</a>
 {% if merchant is defined %}
 <aside class="sidebar" id="workspace-sidebar">
   {{ brand() }}
-  <div class="business-chip"><span class="avatar business-avatar">{{ merchant.name[:1] }}</span><div><strong>{{ merchant.name }}</strong><small>{{ membership.role | capitalize }} workspace</small></div></div>
-  <p class="nav-label">WORKSPACE</p>
+  <div class="business-chip"><span class="avatar business-avatar">{{ merchant.name[:1] }}</span><div><strong>{{ merchant.name }}</strong><small>{{ location.name }}</small></div></div>
   <nav aria-label="Main navigation">
-    {% for key,label,symbol in [('overview','Overview','overview'),('orders','Orders','receipt'),('products','Products','box'),('inventory','Inventory','stock'),('suppliers','Suppliers','store'),('team','Your team','team'),('customers','Customers','team'),('settings','Settings','shield')] %}
-    {% if key not in ['settings','customers','suppliers'] or membership.role == 'owner' %}<a aria-label="{{ label }}" title="{{ label }}" class="nav-item {% if tab == key %}active{% endif %}" {% if tab == key %}aria-current="page"{% endif %} href="/app/{{ merchant.id }}{% if key != 'overview' %}/{{ key }}{% endif %}">{{ icon(symbol) }}<span>{{ label }}</span>{% if key == 'team' %}<span class="nav-count">{{ members | length }}</span>{% endif %}</a>{% endif %}
-    {% endfor %}
+    <a aria-label="Overview" title="Overview" class="nav-item {% if tab == 'overview' %}active{% endif %}" {% if tab == 'overview' %}aria-current="page"{% endif %} href="/app/{{ merchant.id }}">{{ icon('overview') }}<span>Overview</span></a>
+    {% for group,entries in [('SELL',[('pos','Point of sale','receipt'),('orders','Orders','receipt'),('customers','Customers','team')]),('STOCK',[('products','Products','box'),('inventory','Inventory','stock'),('suppliers','Suppliers','store')]),('BUSINESS',[('team','Your team','team'),('settings','Settings','shield')])] %}
+    <div class="nav-group"><p class="nav-label">{{ group }}</p>
+    {% for key,label,symbol in entries %}{% if key not in ['settings','customers','suppliers','pos'] or membership.role == 'owner' or (key == 'pos' and membership.can_sell) %}
+    <a aria-label="{{ label }}" title="{{ label }}" class="nav-item {% if tab == key %}active{% endif %}" {% if tab == key %}aria-current="page"{% endif %} href="/app/{{ merchant.id }}/{{ key }}">{{ icon(symbol) }}<span>{{ label }}</span></a>
+    {% endif %}{% endfor %}</div>{% endfor %}
   </nav>
   <div class="sidebar-bottom">
     <a class="setup-shortcut" href="/app/{{ merchant.id }}#setup"><span class="setup-symbol">{{ icon('check' if ready else 'store') }}</span><div><strong>{{ 'Opening stock ready' if ready else 'Let’s set up shop' }}</strong><small>{{ 1 + (1 if catalogue_count else 0) + (1 if ready else 0) }} of 3 steps complete</small></div>{{ icon('chevron') }}</a>
-    <a class="new-business" href="/businesses">{{ icon('store') }} Switch business</a><a class="new-business" href="/account">{{ icon('shield') }} My account</a><a class="new-business" href="/business/new">{{ icon('plus') }} Add a business</a>
     <div class="sidebar-foot"><span class="brand-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Made for your everyday.</span></div>
   </div>
 </aside>
 <div class="main-shell">
   <header class="topbar">
-    <button class="icon-button sidebar-toggle" aria-label="Collapse sidebar" aria-expanded="true" aria-controls="workspace-sidebar" hidden>{{ icon('overview') }}</button><div class="breadcrumb"><span>Workspace</span>{{ icon('chevron') }}<strong>{{ {'overview':'Overview','orders':'Orders','products':'Products','inventory':'Inventory','team':'Your team','settings':'Settings','customers':'Customers','suppliers':'Suppliers'}[tab] }}</strong></div>
-    <div class="account-tools"><a href="/businesses" aria-label="Switch business" class="location-chip">{{ icon('pin') }}{{ location.name }}</a><a href="/account" class="avatar user-avatar" aria-label="My account" title="{{ display_name | default(user.name) }}">{% if has_avatar | default(false) %}<img src="/account/avatar" alt="Your profile" width="36" height="36">{% else %}{{ (display_name | default(user.name))[:1] }}{% endif %}</a><form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="icon-button" title="Sign out" aria-label="Sign out">{{ icon('logout') }}</button></form></div>
+    <button class="icon-button sidebar-toggle" aria-label="Collapse sidebar" aria-expanded="true" aria-controls="workspace-sidebar" hidden>{{ icon('overview') }}</button><div class="breadcrumb"><span>Workspace</span>{{ icon('chevron') }}<strong>{{ {'overview':'Overview','pos':'Point of sale','orders':'Orders','products':'Products','inventory':'Inventory','team':'Your team','settings':'Settings','customers':'Customers','suppliers':'Suppliers'}[tab] }}</strong></div>
+    <div class="account-tools"><a class="business-switcher" href="/businesses" aria-label="Switch business" title="Switch business"><span class="business-switch-icon">{{ icon('store') }}</span><span>{{ merchant.name }}<small>{{ location.name }}</small></span>{{ icon('chevron') }}</a><a href="/account" data-account-link class="avatar user-avatar" aria-label="My account" title="{{ display_name | default(user.name) }}">{% if has_avatar | default(false) %}<img src="/account/avatar" alt="Your profile" width="36" height="36">{% else %}{{ (display_name | default(user.name))[:1] }}{% endif %}</a><form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="icon-button" title="Sign out" aria-label="Sign out">{{ icon('logout') }}</button></form></div>
   </header>
   <main id="main-content">
     {% if request.query_params.get('notice') %}<div class="notice" role="status">{{ icon('check') }}<span>{{ request.query_params.get('notice') }}</span></div>{% endif %}

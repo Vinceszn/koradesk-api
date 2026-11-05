@@ -32,6 +32,7 @@ document.querySelectorAll('[data-unsaved]').forEach(form => {
     updateUnload();
   });
   formTrackers.set(form, tracker);
+  form.addEventListener('precision:saved', () => tracker.clear());
   form.addEventListener('reset', () => resolveTheme(accountBody.dataset.theme));
   form.addEventListener('submit', event => {
     const password = form.elements.namedItem('password');

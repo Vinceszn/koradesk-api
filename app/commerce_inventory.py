@@ -24,7 +24,7 @@ def number(value, label, minimum=0, maximum=1000000):
     return result
 
 
-def stock_context(request, db, merchant_id, tab):
+def stock_context(request, db, merchant_id, tab, variant_id=None):
     ctx = c.context(request, db, merchant_id, tab)
     page = number(request.query_params.get("page", "1"), "Page", 1, 1000000)
     totals = dict(db.execute(select(m.Movement.variant_id, func.sum(m.Movement.quantity)).where(
@@ -40,7 +40,7 @@ def stock_context(request, db, merchant_id, tab):
             .join(m.Variant, m.Variant.id == m.Movement.variant_id)
             .join(m.User, m.User.id == m.Movement.actor_id)
             .outerjoin(m.StockOperation, m.StockOperation.movement_id == m.Movement.id)
-            .where(m.Movement.merchant_id == merchant_id).order_by(m.Movement.id.desc()).offset((page - 1) * 100).limit(100)).all(),
+            .where(m.Movement.merchant_id == merchant_id, m.Movement.variant_id == variant_id if variant_id is not None else True).order_by(m.Movement.id.desc()).offset((page - 1) * 100).limit(100)).all(),
         reversed_ids=set(db.scalars(select(m.StockOperation.reverses_id).where(
             m.StockOperation.merchant_id == merchant_id, m.StockOperation.reverses_id.is_not(None))).all()))
     return ctx
@@ -54,7 +54,7 @@ def inventory_page(request, db, merchant_id, tab):
 @router.get("/app/{merchant_id}/inventory/{variant_id}")
 def stock_form(request: Request, merchant_id: int, variant_id: int, db: Session = Depends(get_session)):
     c.workspace(request, db, merchant_id, owner=True)
-    ctx = stock_context(request, db, merchant_id, "inventory")
+    ctx = stock_context(request, db, merchant_id, "inventory", variant_id=variant_id)
     row = next((row for row in ctx["rows"] if row[1].id == variant_id), None)
     if not row:
         raise HTTPException(404, "Variant not found.")

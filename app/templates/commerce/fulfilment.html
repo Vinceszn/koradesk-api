@@ -1,0 +1,7 @@
+{% if membership.role == 'owner' and order.order_status == 'placed' %}
+<section class="panel manage-form"><h2>Fulfil or cancel items</h2><p class="hint">Pickup or dispatch requires payment for the full order. Paid items need the returns/refund workflow to cancel.</p>
+<form method="post" action="/app/{{ merchant.id }}/orders/{{ order.id }}/fulfil"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="version" value="{{ order.version }}"><input type="hidden" name="key" value="{{ fulfil_key }}">
+{% for item in items %}{% set remaining=item.quantity-item.fulfilled_quantity-item.cancelled_quantity %}<label>{{ item.product_name }} · {{ item.variant_label }}<small>{{ item.fulfilled_quantity }} fulfilled · {{ item.cancelled_quantity }} cancelled · {{ remaining }} remaining</small><input type="number" name="qty_{{ item.id }}" value="0" min="0" max="{{ remaining }}"></label>{% endfor %}
+<label>Action<select name="action"><option value="pickup">Picked up</option><option value="dispatch">Dispatched</option><option value="cancel">Cancel unpaid items</option></select></label>
+{% if order.payment_status == 'unpaid' %}<label>Cash tendered for full order (₦)<input name="tendered" type="number" min="0" max="20000000" step=".01"></label>{% endif %}<button class="button">Record action</button></form></section>
+{% endif %}

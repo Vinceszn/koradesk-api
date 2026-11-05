@@ -5,7 +5,7 @@
 {% macro select_field(name,label,options) %}<label>{{ label }}<select name="{{ name }}" {% if name == 'theme' %}data-theme-preview{% endif %}>{% for value,text in options %}<option value="{{ value }}" {% if prefs[name] == value %}selected{% endif %}>{{ text }}</option>{% endfor %}</select></label>{% endmacro %}
 {% block content %}
 <div class="account-shell">
-  <header class="account-topbar">{{ brand() }}<div><a class="text-link" href="/">Back to workspace {{ icon('arrow') }}</a><form method="post" action="/logout">{{ token() }}<button class="icon-button" aria-label="Sign out">{{ icon('logout') }}</button></form></div></header>
+  <header class="account-topbar">{{ brand() }}<div><a class="text-link" href="/" data-return-workspace>Back to workspace {{ icon('arrow') }}</a><form method="post" action="/logout">{{ token() }}<button class="icon-button" aria-label="Sign out">{{ icon('logout') }}</button></form></div></header>
   <div class="settings-heading"><h1>Account settings</h1><p>Manage your profile, security, and personal workspace preferences.</p></div>
   <div class="settings-layout">
     <aside class="settings-rail">
@@ -55,6 +55,6 @@
   </div>
     </div>
   </div>
-  <footer class="account-footer"><span>Kora Desk</span><a href="/">Return to workspace</a></footer>
+  <footer class="account-footer"><span>Kora Desk</span><a href="/" data-return-workspace>Return to workspace</a></footer>
 </div>
 {% endblock %}

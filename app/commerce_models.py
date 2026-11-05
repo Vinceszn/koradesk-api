@@ -1,6 +1,6 @@
 """Commerce milestone one. Tenant consistency is enforced by composite FKs."""
 import time
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, ForeignKeyConstraint, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, ForeignKeyConstraint, Index, Integer, LargeBinary, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
@@ -102,6 +102,7 @@ class Membership(Base):
     merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
     user_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"))
     role: Mapped[str] = mapped_column(String(16))
+    can_sell: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
 
 class Location(Base):
@@ -135,6 +136,29 @@ class Variant(Base):
     price_kobo: Mapped[int] = mapped_column(Integer)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
+
+class VariantBarcode(Base):
+    """Barcode values stay text so leading zeroes are preserved."""
+    __tablename__ = "commerce_variant_barcodes"
+    __table_args__ = (
+        ForeignKeyConstraint(["variant_id", "merchant_id"], ["commerce_variants.id", "commerce_variants.merchant_id"]),
+        CheckConstraint("length(code) BETWEEN 1 AND 128"),
+        CheckConstraint("symbology IN ('unknown','ean8','ean13','upca','gtin14','code128')"),
+        Index("uq_active_barcode_merchant", "merchant_id", "code", unique=True,
+              sqlite_where=text("archived = false"), postgresql_where=text("archived = false")),
+        Index("uq_primary_barcode_variant", "merchant_id", "variant_id", unique=True,
+              sqlite_where=text("archived = false AND is_primary = true"),
+              postgresql_where=text("archived = false AND is_primary = true")),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
+    variant_id: Mapped[int] = mapped_column(Integer)
+    code: Mapped[str] = mapped_column(String(128))
+    symbology: Mapped[str] = mapped_column(String(16), default="unknown", server_default="unknown")
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    created_at: Mapped[int] = mapped_column(Integer, default=lambda: int(time.time()))
 
 
 class AccountToken(Base):
@@ -289,6 +313,21 @@ class OrderItem(Base):
     quantity: Mapped[int] = mapped_column(Integer)
     unit_price_kobo: Mapped[int] = mapped_column(Integer)
     line_total_kobo: Mapped[int] = mapped_column(Integer)
+    fulfilled_quantity: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    cancelled_quantity: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class CashSale(Base):
+    __tablename__ = "commerce_cash_sales"
+    __table_args__ = (ForeignKeyConstraint(["order_id", "merchant_id"], ["commerce_orders.id", "commerce_orders.merchant_id"]),
+        UniqueConstraint("order_id"), CheckConstraint("amount_kobo >= 0 AND tendered_kobo >= amount_kobo"))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(ForeignKey("commerce_merchants.id"))
+    order_id: Mapped[int] = mapped_column(Integer)
+    amount_kobo: Mapped[int] = mapped_column(Integer)
+    tendered_kobo: Mapped[int] = mapped_column(Integer)
+    actor_id: Mapped[int] = mapped_column(ForeignKey("commerce_users.id"))
+    at: Mapped[int] = mapped_column(Integer)
 
 
 class StockReservation(Base):

@@ -20,7 +20,7 @@ def catalogue_rows(raw):
         required = {"name", "variant", "sku", "price"}
         if len(fields) != len(set(fields)) or not required.issubset(fields):
             raise HTTPException(400, "Include name, variant, sku and price columns. Column order does not matter. Download the sample below.")
-        extra = set(fields) - required - {"archived"}
+        extra = set(fields) - required - {"archived", "barcode"}
         if extra:
             raise HTTPException(400, "Unsupported columns: " + ", ".join(sorted(extra))[:200] + ". This imports product details only. Record quantities in Inventory.")
         reader.fieldnames = fields
